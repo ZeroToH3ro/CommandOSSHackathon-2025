@@ -6,11 +6,12 @@ import {
   EyeClosedIcon, 
   SizeIcon, 
   ClockIcon, 
-  UpdateIcon // Replace TrendingUpIcon with UpdateIcon
+  UpdateIcon 
 } from '@radix-ui/react-icons';
 import { useTransactionMonitoring } from '../../hooks/useTransactionMonitoring';
 import { usePatternDetection } from '../../hooks/usePatternDetection';
 import { useAlerts } from '../../hooks/useAlerts';
+import { useScamDetector } from '../../hooks/useScamDetector';
 import { PatternDetector } from './PatternDetector';
 import { TransactionMonitor } from './TransactionMonitor';
 
@@ -25,21 +26,28 @@ export const WalletWatcher: React.FC<WalletWatcherProps> = ({
 }) => {
   const [isWatching, setIsWatching] = useState(false);
   const [watchStartTime, setWatchStartTime] = useState<Date | null>(null);
-  const [monitoringInterval] = useState(30000); // 30 seconds - removed setMonitoringInterval
+  const [monitoringInterval] = useState(30000); // 30 seconds
 
   const { 
     transactions, 
     isLoading, 
     error,
-    refetch // Use refetch instead of refreshTransactions
-  } = useTransactionMonitoring(walletAddress, '24h'); // Pass timeRange string instead of boolean
+    refetch 
+  } = useTransactionMonitoring(walletAddress, '24h');
 
   const { 
-    suspiciousPatterns, // Use suspiciousPatterns instead of patterns
+    suspiciousPatterns,
     riskScore
   } = usePatternDetection(transactions);
 
-  const { alerts, addAlert, clearAllAlerts } = useAlerts(); // Use clearAllAlerts instead of clearAlerts
+  const { alerts, addAlert, clearAllAlerts } = useAlerts();
+  
+  // Smart contract integration
+  const {
+    contractDeployed,
+    startMonitoring,
+    stopMonitoring,
+  } = useScamDetector();
 
   // Auto-refresh transactions when watching
   useEffect(() => {
@@ -57,7 +65,7 @@ export const WalletWatcher: React.FC<WalletWatcherProps> = ({
     suspiciousPatterns.forEach((pattern) => {
       if (pattern.riskLevel === 'high') {
         addAlert({
-          type: 'error', // Use 'error' instead of 'security'
+          type: 'error',
           severity: 'high',
           title: 'High Risk Pattern Detected',
           message: `${pattern.description} - Wallet: ${walletAddress.slice(0, 8)}...${walletAddress.slice(-8)}`,
@@ -76,17 +84,58 @@ export const WalletWatcher: React.FC<WalletWatcherProps> = ({
     });
   }, [suspiciousPatterns, addAlert, walletAddress]);
 
-  const handleStartWatching = () => {
-    setIsWatching(true);
-    setWatchStartTime(new Date());
-    clearAllAlerts();
-    onWatchingChange?.(true);
+  const handleStartWatching = async () => {
+    try {
+      setIsWatching(true);
+      setWatchStartTime(new Date());
+      clearAllAlerts();
+      
+      // Start contract monitoring if deployed
+      if (contractDeployed) {
+        const tx = startMonitoring(walletAddress);
+        // Note: In a real app, you would sign and execute this transaction
+        console.log('Contract monitoring transaction prepared:', tx);
+      }
+      
+      onWatchingChange?.(true);
+    } catch (error: any) {
+      console.error('Error starting monitoring:', error);
+      setIsWatching(false);
+      addAlert({
+        type: 'error',
+        severity: 'medium',
+        title: 'Monitoring Error',
+        message: 'Failed to start wallet monitoring. Please try again.',
+        autoClose: true,
+        duration: 5000
+      });
+    }
   };
 
-  const handleStopWatching = () => {
-    setIsWatching(false);
-    setWatchStartTime(null);
-    onWatchingChange?.(false);
+  const handleStopWatching = async () => {
+    try {
+      setIsWatching(false);
+      setWatchStartTime(null);
+      
+      // Stop contract monitoring if deployed
+      if (contractDeployed) {
+        const tx = stopMonitoring(walletAddress);
+        // Note: In a real app, you would sign and execute this transaction
+        console.log('Contract stop monitoring transaction prepared:', tx);
+      }
+      
+      onWatchingChange?.(false);
+    } catch (error: any) {
+      console.error('Error stopping monitoring:', error);
+      addAlert({
+        type: 'warning',
+        severity: 'low',
+        title: 'Stop Monitoring Warning',
+        message: 'There was an issue stopping contract monitoring, but local monitoring has been stopped.',
+        autoClose: true,
+        duration: 5000
+      });
+    }
   };
 
   const getRiskLevelColor = (score: number): 'red' | 'orange' | 'yellow' | 'green' => {

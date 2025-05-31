@@ -8,6 +8,12 @@ interface Alert {
   message: string;
   timestamp: number;
   severity: 'low' | 'medium' | 'high' | 'critical';
+  // Contract-specific fields
+  sender?: string;
+  recipient?: string;
+  amount?: string;
+  riskScore?: number;
+  txDigest?: string;
 }
 
 interface AlertBannerProps {
@@ -71,6 +77,51 @@ export function AlertBanner({ alert, onDismiss }: AlertBannerProps) {
             <Text size="1" color="gray" className="mt-1">
               {new Date(alert.timestamp).toLocaleString()}
             </Text>
+            
+            {/* Contract-specific information */}
+            {(alert.sender || alert.recipient || alert.amount || alert.riskScore) && (
+              <Box mt="2" p="2" style={{ 
+                backgroundColor: 'var(--gray-2)', 
+                borderRadius: 'var(--radius-2)' 
+              }}>
+                {alert.riskScore && (
+                  <Flex align="center" gap="2" mb="1">
+                    <Text size="1" color="gray">Risk Score:</Text>
+                    <Badge color={alert.riskScore >= 70 ? 'red' : alert.riskScore >= 40 ? 'orange' : 'green'} size="1">
+                      {alert.riskScore}
+                    </Badge>
+                  </Flex>
+                )}
+                {alert.amount && (
+                  <Box style={{ display: 'block' }}>
+                    <Text size="1" color="gray">
+                      Amount: {alert.amount} SUI
+                    </Text>
+                  </Box>
+                )}
+                {alert.sender && (
+                  <Box style={{ display: 'block' }}>
+                    <Text size="1" color="gray" style={{ fontFamily: 'monospace' }}>
+                      From: {alert.sender.slice(0, 10)}...{alert.sender.slice(-8)}
+                    </Text>
+                  </Box>
+                )}
+                {alert.recipient && (
+                  <Box style={{ display: 'block' }}>
+                    <Text size="1" color="gray" style={{ fontFamily: 'monospace' }}>
+                      To: {alert.recipient.slice(0, 10)}...{alert.recipient.slice(-8)}
+                    </Text>
+                  </Box>
+                )}
+                {alert.txDigest && (
+                  <Box style={{ display: 'block' }}>
+                    <Text size="1" color="gray" style={{ fontFamily: 'monospace' }}>
+                      Tx: {alert.txDigest.slice(0, 10)}...{alert.txDigest.slice(-8)}
+                    </Text>
+                  </Box>
+                )}
+              </Box>
+            )}
           </Box>
         </Flex>
         

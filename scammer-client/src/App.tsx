@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { ConnectButton, useCurrentAccount } from "@mysten/dapp-kit";
 import { Box, Container, Flex, Heading, Tabs, Badge, Text } from "@radix-ui/themes";
-import { SizeIcon, ActivityLogIcon, BarChartIcon, ExclamationTriangleIcon } from "@radix-ui/react-icons";
+import { SizeIcon, ActivityLogIcon, BarChartIcon, ExclamationTriangleIcon, GearIcon } from "@radix-ui/react-icons";
 import { WalletStatus } from "./WalletStatus";
 import { Dashboard } from "./components/dashboard/Dashboard";
 import { WalletWatcher } from "./components/monitoring/WalletWatcher";
 import { TransactionFilter } from "./components/transactions/TransactionFilter";
 import { AlertList } from "./components/alerts/AlertList";
+import { AdminPanel } from "./components/admin";
 import { useAlerts } from "./hooks/useAlerts";
 import { useTransactionMonitoring } from "./hooks/useTransactionMonitoring";
+import { useScamDetector } from "./hooks/useScamDetector";
 
 function App() {
   const currentAccount = useCurrentAccount();
@@ -20,11 +22,19 @@ function App() {
   const walletAddress = currentAccount?.address || '';
 
   const { transactions } = useTransactionMonitoring(walletAddress, '24h');
+  
+  // Smart contract integration
+  const {
+    alerts: contractAlerts,
+  } = useScamDetector();
+
+  // Merge local and contract alerts
+  const allAlerts = [...alerts, ...contractAlerts];
 
   const getTabBadgeCount = (tab: string) => {
     switch (tab) {
       case 'alerts':
-        return alerts.length;
+        return allAlerts.length;
       case 'monitoring':
         return isWatching ? 1 : 0;
       case 'transactions':
@@ -64,7 +74,7 @@ function App() {
 
         <Flex align="center" gap="3">
           {/* Alert indicator */}
-          {alerts.length > 0 && (
+          {allAlerts.length > 0 && (
             <Flex align="center" gap="2" p="2" style={{ 
               backgroundColor: 'var(--red-3)', 
               borderRadius: '6px',
@@ -72,7 +82,7 @@ function App() {
             }}>
               <ExclamationTriangleIcon style={{ width: '16px', height: '16px', color: 'var(--red-9)' }} />
               <Text size="2" color="red" weight="medium">
-                {alerts.length} alert{alerts.length !== 1 ? 's' : ''}
+                {allAlerts.length} alert{allAlerts.length !== 1 ? 's' : ''}
               </Text>
             </Flex>
           )}
@@ -172,6 +182,20 @@ function App() {
                     )}
                   </Flex>
                 </Tabs.Trigger>
+                
+                <Tabs.Trigger value="admin">
+                  <Flex align="center" gap="2">
+                    <GearIcon style={{ width: '16px', height: '16px' }} />
+                    Admin
+                  </Flex>
+                </Tabs.Trigger>
+
+                <Tabs.Trigger value="status">
+                  <Flex align="center" gap="2">
+                    <SizeIcon style={{ width: '16px', height: '16px' }} />
+                    AI Status
+                  </Flex>
+                </Tabs.Trigger>
               </Tabs.List>
 
               <Tabs.Content value="dashboard">
@@ -248,7 +272,7 @@ function App() {
                   </Box>
                   
                   <AlertList 
-                    alerts={alerts.map(alert => ({
+                    alerts={allAlerts.map(alert => ({
                       ...alert,
                       timestamp: new Date(alert.timestamp)
                     }))}
@@ -259,6 +283,12 @@ function App() {
                     maxAlerts={10}
                     showTimestamps={true}
                   />
+                </Flex>
+              </Tabs.Content>
+
+              <Tabs.Content value="admin">
+                <Flex direction="column" gap="6">
+                  <AdminPanel />
                 </Flex>
               </Tabs.Content>
             </Tabs.Root>
