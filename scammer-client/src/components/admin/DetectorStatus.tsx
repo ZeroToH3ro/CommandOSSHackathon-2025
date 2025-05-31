@@ -10,6 +10,7 @@ export function DetectorStatus() {
   
   const {
     contractDeployed,
+    adminAddress,
     loading,
     alerts,
     patterns,
@@ -144,6 +145,16 @@ export function DetectorStatus() {
         <Box>
           <Text weight="medium" mb="3">Configuration</Text>
           <Flex direction="column" gap="2">
+            
+            {/* Admin Address */}
+            {adminAddress && (
+              <Flex justify="between" align="center">
+                <Text size="2" color="gray">Admin Address:</Text>
+                <Text size="2" style={{ fontFamily: 'monospace' }}>
+                  {adminAddress.slice(0, 8)}...{adminAddress.slice(-6)}
+                </Text>
+              </Flex>
+            )}
             
             <Flex justify="between" align="center">
               <Text size="2" color="gray">Network:</Text>

@@ -1,55 +1,123 @@
 import { useState } from 'react';
 import { Card, Flex, Text, Button, Heading, Box, TextField, Badge, Separator } from '@radix-ui/themes';
 import { PlusIcon, TrashIcon, ExclamationTriangleIcon, CheckCircledIcon } from '@radix-ui/react-icons';
+import { useSignAndExecuteTransaction, useCurrentAccount } from '@mysten/dapp-kit';
 import { useScamDetector } from '../../hooks/useScamDetector';
+import { TransactionStatus } from '../wallet/TransactionStatus';
 
 export function AdminPanel() {
   const [scammerAddress, setScammerAddress] = useState('');
   const [whitelistAddress, setWhitelistAddress] = useState('');
   const [bulkAddresses, setBulkAddresses] = useState('');
   const [loading, setLoading] = useState(false);
+  const [txStatus, setTxStatus] = useState<string>('');
+
+  const currentAccount = useCurrentAccount();
+  const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
 
   const {
     contractDeployed,
+    adminAddress,
     addScammerAddresses,
     addWhitelistedAddresses,
     alerts,
     patterns
   } = useScamDetector();
 
+  // Check if current user is admin
+  const isAdmin = currentAccount?.address === adminAddress;
+  const isWalletConnected = !!currentAccount;
+  const canUseAdminFunctions = isWalletConnected && isAdmin && contractDeployed;
+
   const handleAddScammer = async () => {
-    if (!scammerAddress.trim()) return;
+    if (!scammerAddress.trim() || !currentAccount) return;
     
     setLoading(true);
+    setTxStatus('Preparing transaction...');
+    
     try {
-      const tx = addScammerAddresses([scammerAddress.trim()]);
-      console.log('Add scammer transaction prepared:', tx);
-      // In a real app, you would sign and execute this transaction
-      setScammerAddress('');
+      const txb = addScammerAddresses([scammerAddress.trim()]);
+      
+      setTxStatus('Please sign the transaction in your wallet...');
+      
+      signAndExecuteTransaction(
+        {
+          transaction: txb,
+          account: currentAccount,
+        },
+        {
+          onSuccess: (result) => {
+            console.log('Scammer address added successfully:', result);
+            setTxStatus(`✅ Transaction successful: ${result.digest}`);
+            setScammerAddress('');
+            
+            // Clear status after 5 seconds
+            setTimeout(() => setTxStatus(''), 5000);
+          },
+          onError: (error) => {
+            console.error('Error executing transaction:', error);
+            setTxStatus(`❌ Transaction failed: ${error.message}`);
+            
+            // Clear status after 5 seconds
+            setTimeout(() => setTxStatus(''), 5000);
+          },
+        }
+      );
     } catch (error) {
-      console.error('Error adding scammer:', error);
+      console.error('Error preparing transaction:', error);
+      setTxStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTimeout(() => setTxStatus(''), 5000);
     } finally {
       setLoading(false);
     }
   };
 
   const handleAddToWhitelist = async () => {
-    if (!whitelistAddress.trim()) return;
+    if (!whitelistAddress.trim() || !currentAccount) return;
     
     setLoading(true);
+    setTxStatus('Preparing transaction...');
+    
     try {
-      const tx = addWhitelistedAddresses([whitelistAddress.trim()]);
-      console.log('Add whitelist transaction prepared:', tx);
-      // In a real app, you would sign and execute this transaction
-      setWhitelistAddress('');
+      const txb = addWhitelistedAddresses([whitelistAddress.trim()]);
+      
+      setTxStatus('Please sign the transaction in your wallet...');
+      
+      signAndExecuteTransaction(
+        {
+          transaction: txb,
+          account: currentAccount,
+        },
+        {
+          onSuccess: (result) => {
+            console.log('Whitelist address added successfully:', result);
+            setTxStatus(`✅ Transaction successful: ${result.digest}`);
+            setWhitelistAddress('');
+            
+            // Clear status after 5 seconds
+            setTimeout(() => setTxStatus(''), 5000);
+          },
+          onError: (error) => {
+            console.error('Error executing transaction:', error);
+            setTxStatus(`❌ Transaction failed: ${error.message}`);
+            
+            // Clear status after 5 seconds
+            setTimeout(() => setTxStatus(''), 5000);
+          },
+        }
+      );
     } catch (error) {
-      console.error('Error adding to whitelist:', error);
+      console.error('Error preparing transaction:', error);
+      setTxStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTimeout(() => setTxStatus(''), 5000);
     } finally {
       setLoading(false);
     }
   };
 
   const handleBulkAdd = async (type: 'scammer' | 'whitelist') => {
+    if (!currentAccount) return;
+    
     const addresses = bulkAddresses
       .split('\n')
       .map(addr => addr.trim())
@@ -58,14 +126,42 @@ export function AdminPanel() {
     if (addresses.length === 0) return;
     
     setLoading(true);
+    setTxStatus(`Preparing bulk ${type} transaction for ${addresses.length} addresses...`);
+    
     try {
-      const tx = type === 'scammer' 
+      const txb = type === 'scammer' 
         ? addScammerAddresses(addresses)
         : addWhitelistedAddresses(addresses);
-      console.log(`Bulk ${type} transaction prepared:`, tx);
-      setBulkAddresses('');
+      
+      setTxStatus('Please sign the transaction in your wallet...');
+      
+      signAndExecuteTransaction(
+        {
+          transaction: txb,
+          account: currentAccount,
+        },
+        {
+          onSuccess: (result) => {
+            console.log(`Bulk ${type} addresses added successfully:`, result);
+            setTxStatus(`✅ Bulk operation successful: ${result.digest}`);
+            setBulkAddresses('');
+            
+            // Clear status after 5 seconds
+            setTimeout(() => setTxStatus(''), 5000);
+          },
+          onError: (error) => {
+            console.error('Error executing bulk transaction:', error);
+            setTxStatus(`❌ Bulk transaction failed: ${error.message}`);
+            
+            // Clear status after 5 seconds
+            setTimeout(() => setTxStatus(''), 5000);
+          },
+        }
+      );
     } catch (error) {
       console.error(`Error bulk adding ${type}s:`, error);
+      setTxStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setTimeout(() => setTxStatus(''), 5000);
     } finally {
       setLoading(false);
     }
@@ -87,6 +183,22 @@ export function AdminPanel() {
     );
   }
 
+  if (!currentAccount) {
+    return (
+      <Card>
+        <Flex p="6" direction="column" align="center" gap="4">
+          <ExclamationTriangleIcon style={{ width: '48px', height: '48px', color: 'var(--orange-9)' }} />
+          <Box style={{ textAlign: 'center' }}>
+            <Heading size="5" mb="2">Wallet Not Connected</Heading>
+            <Text color="gray">
+              Please connect your wallet to use admin functions.
+            </Text>
+          </Box>
+        </Flex>
+      </Card>
+    );
+  }
+
   return (
     <Box>
       <Flex direction="column" gap="6">
@@ -98,6 +210,46 @@ export function AdminPanel() {
           </Text>
         </Box>
 
+        {/* Admin Authorization Status */}
+        <Card>
+          <Flex p="4" direction="column" gap="3">
+            <Flex align="center" gap="3">
+              {isAdmin ? (
+                <CheckCircledIcon style={{ width: '20px', height: '20px', color: 'var(--green-9)' }} />
+              ) : (
+                <ExclamationTriangleIcon style={{ width: '20px', height: '20px', color: 'var(--orange-9)' }} />
+              )}
+              <Box>
+                <Text weight="medium">
+                  {isAdmin ? 'Admin Access Granted' : 'Admin Access Required'}
+                </Text>
+                <Text size="2" color="gray">
+                  {isAdmin 
+                    ? 'You have admin privileges for this contract'
+                    : 'Connect with the admin wallet to use admin functions'
+                  }
+                </Text>
+              </Box>
+              <Badge color={isAdmin ? 'green' : 'orange'} variant="soft">
+                {isAdmin ? 'Authorized' : 'Unauthorized'}
+              </Badge>
+            </Flex>
+            
+            {adminAddress && (
+              <Box>
+                <Text size="2" color="gray">
+                  <strong>Admin Address:</strong> {adminAddress}
+                </Text>
+                {currentAccount?.address && (
+                  <Text size="2" color="gray">
+                    <strong>Current Wallet:</strong> {currentAccount.address}
+                  </Text>
+                )}
+              </Box>
+            )}
+          </Flex>
+        </Card>
+
         {/* Contract Status */}
         <Card>
           <Flex p="4" align="center" gap="3">
@@ -108,6 +260,14 @@ export function AdminPanel() {
             </Box>
           </Flex>
         </Card>
+
+        {/* Transaction Status */}
+        {txStatus && (
+          <TransactionStatus 
+            status={txStatus} 
+            onClear={() => setTxStatus('')}
+          />
+        )}
 
         {/* Quick Stats */}
         <Flex gap="4">
@@ -142,7 +302,7 @@ export function AdminPanel() {
                 />
                 <Button 
                   onClick={handleAddScammer}
-                  disabled={!scammerAddress.trim() || loading}
+                  disabled={!scammerAddress.trim() || loading || !canUseAdminFunctions}
                   color="red"
                 >
                   <PlusIcon />
@@ -165,7 +325,7 @@ export function AdminPanel() {
                 />
                 <Button 
                   onClick={handleAddToWhitelist}
-                  disabled={!whitelistAddress.trim() || loading}
+                  disabled={!whitelistAddress.trim() || loading || !canUseAdminFunctions}
                   color="green"
                 >
                   <PlusIcon />
@@ -206,7 +366,7 @@ export function AdminPanel() {
               <Flex gap="2" mt="2">
                 <Button 
                   onClick={() => handleBulkAdd('scammer')}
-                  disabled={!bulkAddresses.trim() || loading}
+                  disabled={!bulkAddresses.trim() || loading || !canUseAdminFunctions}
                   color="red"
                   variant="outline"
                 >
@@ -215,7 +375,7 @@ export function AdminPanel() {
                 </Button>
                 <Button 
                   onClick={() => handleBulkAdd('whitelist')}
-                  disabled={!bulkAddresses.trim() || loading}
+                  disabled={!bulkAddresses.trim() || loading || !canUseAdminFunctions}
                   color="green"
                   variant="outline"
                 >

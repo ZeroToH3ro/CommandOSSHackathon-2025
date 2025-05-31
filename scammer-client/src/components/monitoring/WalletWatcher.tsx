@@ -8,12 +8,14 @@ import {
   ClockIcon, 
   UpdateIcon 
 } from '@radix-ui/react-icons';
+import { useSignAndExecuteTransaction, useCurrentAccount } from '@mysten/dapp-kit';
 import { useTransactionMonitoring } from '../../hooks/useTransactionMonitoring';
 import { usePatternDetection } from '../../hooks/usePatternDetection';
 import { useAlerts } from '../../hooks/useAlerts';
 import { useScamDetector } from '../../hooks/useScamDetector';
 import { PatternDetector } from './PatternDetector';
 import { TransactionMonitor } from './TransactionMonitor';
+import { TransactionStatus } from '../wallet/TransactionStatus';
 
 interface WalletWatcherProps {
   walletAddress: string;
@@ -27,6 +29,10 @@ export const WalletWatcher: React.FC<WalletWatcherProps> = ({
   const [isWatching, setIsWatching] = useState(false);
   const [watchStartTime, setWatchStartTime] = useState<Date | null>(null);
   const [monitoringInterval] = useState(30000); // 30 seconds
+  const [txStatus, setTxStatus] = useState<string>('');
+
+  const currentAccount = useCurrentAccount();
+  const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
 
   const { 
     transactions, 
@@ -45,9 +51,13 @@ export const WalletWatcher: React.FC<WalletWatcherProps> = ({
   // Smart contract integration
   const {
     contractDeployed,
+    adminAddress,
     startMonitoring,
     stopMonitoring,
   } = useScamDetector();
+
+  // Check if current user is admin
+  const isAdmin = currentAccount?.address === adminAddress;
 
   // Auto-refresh transactions when watching
   useEffect(() => {
@@ -90,11 +100,38 @@ export const WalletWatcher: React.FC<WalletWatcherProps> = ({
       setWatchStartTime(new Date());
       clearAllAlerts();
       
-      // Start contract monitoring if deployed
-      if (contractDeployed) {
-        const tx = startMonitoring(walletAddress);
-        // Note: In a real app, you would sign and execute this transaction
-        console.log('Contract monitoring transaction prepared:', tx);
+      // Start contract monitoring if deployed and wallet connected
+      if (contractDeployed && currentAccount) {
+        if (!isAdmin) {
+          setTxStatus('⚠️ Admin wallet required for blockchain monitoring, using local monitoring only');
+          setTimeout(() => setTxStatus(''), 5000);
+        } else {
+          setTxStatus('Starting blockchain monitoring...');
+          
+          const txb = startMonitoring(walletAddress);
+          
+          signAndExecuteTransaction(
+            {
+              transaction: txb,
+              account: currentAccount,
+            },
+            {
+              onSuccess: (result) => {
+                console.log('Monitoring started successfully:', result);
+                setTxStatus(`✅ Blockchain monitoring active: ${result.digest.slice(0, 8)}...`);
+                setTimeout(() => setTxStatus(''), 5000);
+              },
+              onError: (error) => {
+                console.error('Error starting blockchain monitoring:', error);
+                const errorMessage = error.message?.includes('EUnauthorized') 
+                  ? 'Unauthorized: Admin wallet required for blockchain monitoring'
+                  : 'Blockchain monitoring failed, using local monitoring only';
+                setTxStatus(`⚠️ ${errorMessage}`);
+                setTimeout(() => setTxStatus(''), 5000);
+              },
+            }
+          );
+        }
       }
       
       onWatchingChange?.(true);
@@ -117,11 +154,38 @@ export const WalletWatcher: React.FC<WalletWatcherProps> = ({
       setIsWatching(false);
       setWatchStartTime(null);
       
-      // Stop contract monitoring if deployed
-      if (contractDeployed) {
-        const tx = stopMonitoring(walletAddress);
-        // Note: In a real app, you would sign and execute this transaction
-        console.log('Contract stop monitoring transaction prepared:', tx);
+      // Stop contract monitoring if deployed and wallet connected
+      if (contractDeployed && currentAccount) {
+        if (!isAdmin) {
+          setTxStatus('⚠️ Local monitoring stopped, admin wallet required for blockchain control');
+          setTimeout(() => setTxStatus(''), 5000);
+        } else {
+          setTxStatus('Stopping blockchain monitoring...');
+          
+          const txb = stopMonitoring(walletAddress);
+          
+          signAndExecuteTransaction(
+            {
+              transaction: txb,
+              account: currentAccount,
+            },
+            {
+              onSuccess: (result) => {
+                console.log('Monitoring stopped successfully:', result);
+                setTxStatus(`✅ Blockchain monitoring stopped: ${result.digest.slice(0, 8)}...`);
+                setTimeout(() => setTxStatus(''), 5000);
+              },
+              onError: (error) => {
+                console.error('Error stopping blockchain monitoring:', error);
+                const errorMessage = error.message?.includes('EUnauthorized') 
+                  ? 'Unauthorized: Admin wallet required to stop blockchain monitoring'
+                  : 'Local monitoring stopped, blockchain monitoring may still be active';
+                setTxStatus(`⚠️ ${errorMessage}`);
+                setTimeout(() => setTxStatus(''), 5000);
+              },
+            }
+          );
+        }
       }
       
       onWatchingChange?.(false);
@@ -181,18 +245,48 @@ export const WalletWatcher: React.FC<WalletWatcherProps> = ({
             </Box>
             <Flex align="center" gap="2">
               {isWatching ? (
-                <Button onClick={handleStopWatching} variant="outline" size="2">
+                <Button 
+                  onClick={handleStopWatching} 
+                  variant="outline" 
+                  size="2"
+                  disabled={!currentAccount}
+                >
                   <EyeClosedIcon style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                   Stop Watching
                 </Button>
               ) : (
-                <Button onClick={handleStartWatching} size="2">
+                <Button 
+                  onClick={handleStartWatching} 
+                  size="2"
+                  disabled={!currentAccount}
+                >
                   <EyeOpenIcon style={{ width: '16px', height: '16px', marginRight: '8px' }} />
                   Start Watching
                 </Button>
               )}
+              {!currentAccount ? (
+                <Text size="1" color="gray">
+                  Connect wallet for monitoring
+                </Text>
+              ) : !isAdmin ? (
+                <Text size="1" color="orange">
+                  Admin wallet required for blockchain monitoring
+                </Text>
+              ) : (
+                <Text size="1" color="green">
+                  Blockchain monitoring available
+                </Text>
+              )}
             </Flex>
           </Flex>
+
+          {/* Transaction Status */}
+          {txStatus && (
+            <TransactionStatus 
+              status={txStatus} 
+              onClear={() => setTxStatus('')}
+            />
+          )}
 
           <Flex gap="4" wrap="wrap">
             <Box style={{ textAlign: 'center', flex: 1, minWidth: '120px' }}>

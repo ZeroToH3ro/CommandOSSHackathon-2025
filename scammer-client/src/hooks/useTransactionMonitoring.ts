@@ -13,7 +13,7 @@ interface TransactionMonitoringResult {
   refetch: () => void;
 }
 
-const suiClient = new SuiClient({ url: getFullnodeUrl('testnet') });
+const suiClient = new SuiClient({ url: getFullnodeUrl((import.meta.env.VITE_NETWORK as 'testnet' | 'devnet' | 'mainnet') || 'devnet') });
 
 export function useTransactionMonitoring(
   walletAddress?: string,

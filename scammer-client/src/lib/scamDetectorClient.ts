@@ -86,6 +86,43 @@ export class ScamDetectorClient {
     return tx;
   }
 
+  // Get admin address
+  async getAdmin(): Promise<string> {
+    if (!CONTRACT_CONFIG.PACKAGE_ID || CONTRACT_CONFIG.PACKAGE_ID === "0x0") {
+      throw new Error("Contract not deployed. Please deploy the contract first.");
+    }
+
+    try {
+      const tx = new Transaction();
+      
+      tx.moveCall({
+        target: `${CONTRACT_CONFIG.PACKAGE_ID}::scammer::get_admin`,
+        arguments: [
+          tx.object(CONTRACT_CONFIG.DETECTOR_STATE_ID),
+        ],
+      });
+
+      const result = await this.suiClient.devInspectTransactionBlock({
+        transactionBlock: tx,
+        sender: '0x0000000000000000000000000000000000000000000000000000000000000000',
+      });
+
+      // Parse the result to get address
+      if (result.results?.[0]?.returnValues?.[0]) {
+        const bytes = result.results[0].returnValues[0][0];
+        // Convert bytes to hex address
+        if (Array.isArray(bytes)) {
+          const hex = '0x' + bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+          return hex;
+        }
+      }
+      throw new Error("Failed to get admin address");
+    } catch (error) {
+      console.error('Error getting admin address:', error);
+      throw error;
+    }
+  }
+
   // Check wallet risk score
   async getWalletRiskScore(walletAddress: string): Promise<number> {
     if (!CONTRACT_CONFIG.PACKAGE_ID || CONTRACT_CONFIG.PACKAGE_ID === "0x0") {

@@ -403,6 +403,11 @@ module scammer::scammer {
 
     // ===== Public View Functions =====
 
+    /// Get admin address
+    public fun get_admin(detector_state: &DetectorState): address {
+        detector_state.admin
+    }
+
     /// Get wallet risk score
     public fun get_wallet_risk_score(
         detector_state: &DetectorState,

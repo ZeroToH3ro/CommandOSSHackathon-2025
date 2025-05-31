@@ -48,19 +48,35 @@ export function useScamDetector() {
   const [monitoringWallets, setMonitoringWallets] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [contractDeployed, setContractDeployed] = useState(false);
+  const [adminAddress, setAdminAddress] = useState<string>('');
 
   const suiClient = useSuiClient();
   const scamDetectorClient = new ScamDetectorClient(suiClient);
 
-  // Check if contract is deployed
+  // Check if contract is deployed and fetch admin address
   useEffect(() => {
     const isDeployed = CONTRACT_CONFIG.PACKAGE_ID !== "0x0" && CONTRACT_CONFIG.DETECTOR_STATE_ID !== "0x0";
     setContractDeployed(isDeployed);
     
     if (!isDeployed) {
       console.warn("Scam detector contract not deployed. Please deploy the contract and update the configuration.");
+    } else {
+      // Fetch admin address when contract is deployed
+      fetchAdminAddress();
     }
   }, []);
+
+  // Fetch admin address from contract
+  const fetchAdminAddress = useCallback(async () => {
+    if (!contractDeployed) return;
+    
+    try {
+      const admin = await scamDetectorClient.getAdmin();
+      setAdminAddress(admin);
+    } catch (error) {
+      console.error('Error fetching admin address:', error);
+    }
+  }, [contractDeployed, scamDetectorClient]);
 
   // Subscribe to contract events
   useEffect(() => {
@@ -248,6 +264,7 @@ export function useScamDetector() {
     // State
     loading,
     contractDeployed,
+    adminAddress,
     
     // Actions
     checkWalletRisk,
@@ -258,6 +275,7 @@ export function useScamDetector() {
     stopMonitoring,
     clearAlerts,
     dismissAlert,
+    fetchAdminAddress,
   };
 }
 
