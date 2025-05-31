@@ -23,7 +23,7 @@ export function usePatternDetection(transactions: Transaction[]): PatternDetecti
 
   // Analyze transactions for suspicious patterns
   const analysis = useMemo(() => {
-    if (transactions.length === 0) {
+    if (transactions.length === 0) {  
       return {
         suspiciousPatterns: [],
         riskScore: 0,
