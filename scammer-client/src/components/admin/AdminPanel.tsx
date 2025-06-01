@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Card, Flex, Text, Button, Heading, Box, TextField, Badge, Separator } from '@radix-ui/themes';
-import { PlusIcon, TrashIcon, ExclamationTriangleIcon, CheckCircledIcon } from '@radix-ui/react-icons';
+import { PlusIcon, TrashIcon, ExclamationTriangleIcon, CheckCircledIcon, GearIcon } from '@radix-ui/react-icons';
 import { useSignAndExecuteTransaction, useCurrentAccount } from '@mysten/dapp-kit';
 import { useScamDetector } from '../../hooks/useScamDetector';
 import { TransactionStatus } from '../wallet/TransactionStatus';
+import { EnhancedTransactionAnalyzer } from '../ai/EnhancedTransactionAnalyzer';
 
 export function AdminPanel() {
   const [scammerAddress, setScammerAddress] = useState('');
@@ -44,7 +45,6 @@ export function AdminPanel() {
         },
         {
           onSuccess: (result) => {
-            console.log('Scammer address added successfully:', result);
             setTxStatus(`✅ Transaction successful: ${result.digest}`);
             setScammerAddress('');
             
@@ -314,7 +314,7 @@ export function AdminPanel() {
                   onChange={(e) => setWhitelistAddress(e.target.value)}
                   style={{ flex: 1 }}
                 />
-                <Button 
+                <Button
                   onClick={handleAddToWhitelist}
                   disabled={!whitelistAddress.trim() || loading || !canUseAdminFunctions}
                   color="green"
@@ -413,6 +413,90 @@ export function AdminPanel() {
             )}
           </Flex>
         </Card>
+
+        {/* AI Transaction Analyzer */}
+        <Card>
+          <Flex p="4" direction="column" gap="4">
+            <Flex justify="between" align="center">
+              <Heading size="4">Transaction Analyzer</Heading>
+              <Button 
+                onClick={() => {}}
+                color="blue"
+                variant="outline"
+                size="2"
+                disabled={!currentAccount}
+              >
+                <GearIcon />
+                Configure
+              </Button>
+            </Flex>
+            
+            <Text color="gray" size="3">
+              Get insights on recent transactions and detect potential scams
+            </Text>
+          </Flex>
+        </Card>
+
+        {/* AI Configuration */}
+        <Card>
+          <Flex p="4" direction="column" gap="4">
+            <Heading size="4">AI Risk Assessment Configuration</Heading>
+            
+            <Box>
+              <Text weight="medium" mb="2">AI Models Available</Text>
+              <Flex gap="2" wrap="wrap">
+                <Badge color="green" variant="soft">GPT-4</Badge>
+                <Badge color="blue" variant="soft">Gemini Pro</Badge>
+                <Badge color="orange" variant="soft">Ollama (Local)</Badge>
+              </Flex>
+              <Text size="2" color="gray" mt="2">
+                Configure API keys in .env.local to enable AI risk assessment
+              </Text>
+            </Box>
+
+            <Separator />
+
+            <Box>
+              <Text weight="medium" mb="2">Current Configuration</Text>
+              <Flex direction="column" gap="2" style={{ fontSize: '14px' }}>
+                <Flex justify="between">
+                  <Text size="2">AI Assessment:</Text>
+                  <Badge color="green" variant="soft">Enabled</Badge>
+                </Flex>
+                <Flex justify="between">
+                  <Text size="2">Risk Weight:</Text>
+                  <Text size="2">30% (AI + 70% Rules)</Text>
+                </Flex>
+                <Flex justify="between">
+                  <Text size="2">Confidence Threshold:</Text>
+                  <Text size="2">70%</Text>
+                </Flex>
+                <Flex justify="between">
+                  <Text size="2">Response Timeout:</Text>
+                  <Text size="2">5 seconds</Text>
+                </Flex>
+              </Flex>
+            </Box>
+          </Flex>
+        </Card>
+
+        {/* Enhanced Transaction Analysis Demo */}
+        {canUseAdminFunctions && (
+          <Card>
+            <Flex p="4" direction="column" gap="4">
+              <Flex align="center" gap="3">
+                <GearIcon style={{ width: '20px', height: '20px' }} />
+                <Heading size="4">Test AI Risk Assessment</Heading>
+              </Flex>
+              
+              <EnhancedTransactionAnalyzer
+                sender="0x1234567890abcdef1234567890abcdef12345678"
+                recipient="0xabcdef1234567890abcdef1234567890abcdef12"
+                amount="1000"
+              />
+            </Flex>
+          </Card>
+        )}
       </Flex>
     </Box>
   );

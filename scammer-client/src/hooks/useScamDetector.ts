@@ -252,6 +252,39 @@ export function useScamDetector() {
     setAlerts(prev => prev.filter(alert => alert.id !== alertId));
   }, []);
 
+  // Get AI configuration from contract
+  const getAIConfig = useCallback(async () => {
+    if (!suiClient) return null;
+    
+    try {
+      return await scamDetectorClient.getAIConfig();
+    } catch (error) {
+      console.error('Error getting AI config:', error);
+      return null;
+    }
+  }, [suiClient, scamDetectorClient]);
+
+  // Get risk thresholds from contract
+  const getRiskThresholds = useCallback(async () => {
+    if (!suiClient) return null;
+    
+    try {
+      return await scamDetectorClient.getRiskThresholds();
+    } catch (error) {
+      console.error('Error getting risk thresholds:', error);
+      return null;
+    }
+  }, [suiClient, scamDetectorClient]);
+
+  // Update AI configuration (admin only)
+  const updateAIConfig = useCallback((aiConfig: any) => {
+    if (!suiClient) {
+      throw new Error("Client not initialized");
+    }
+    
+    return scamDetectorClient.updateAIConfig(aiConfig);
+  }, [suiClient, scamDetectorClient]);
+
   return {
     // Data
     alerts,
@@ -274,6 +307,9 @@ export function useScamDetector() {
     clearAlerts,
     dismissAlert,
     fetchAdminAddress,
+    getAIConfig,
+    getRiskThresholds,
+    updateAIConfig,
   };
 }
 

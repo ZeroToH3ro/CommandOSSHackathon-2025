@@ -6,7 +6,8 @@ import {
   EyeClosedIcon, 
   SizeIcon, 
   ClockIcon, 
-  UpdateIcon 
+  UpdateIcon,
+  LightningBoltIcon
 } from '@radix-ui/react-icons';
 import { useSignAndExecuteTransaction, useCurrentAccount } from '@mysten/dapp-kit';
 import { useTransactionMonitoring } from '../../hooks/useTransactionMonitoring';
@@ -16,6 +17,8 @@ import { useScamDetector } from '../../hooks/useScamDetector';
 import { PatternDetector } from './PatternDetector';
 import { TransactionMonitor } from './TransactionMonitor';
 import { TransactionStatus } from '../wallet/TransactionStatus';
+import { AIRiskValidator } from '../ai/AIRiskValidator';
+import { aiService } from '../../services/aiService';
 
 interface WalletWatcherProps {
   walletAddress: string;
@@ -30,6 +33,9 @@ export const WalletWatcher: React.FC<WalletWatcherProps> = ({
   const [watchStartTime, setWatchStartTime] = useState<Date | null>(null);
   const [monitoringInterval] = useState(30000); // 30 seconds
   const [txStatus, setTxStatus] = useState<string>('');
+  const [aiMonitoringEnabled, setAiMonitoringEnabled] = useState(true);
+  const [lastAiAssessment, setLastAiAssessment] = useState<any>(null);
+  const [aiAssessmentCount, setAiAssessmentCount] = useState(0);
 
   const currentAccount = useCurrentAccount();
   const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
@@ -63,12 +69,18 @@ export const WalletWatcher: React.FC<WalletWatcherProps> = ({
   useEffect(() => {
     if (!isWatching) return;
 
-    const interval = setInterval(() => {
-      refetch();
+    const interval = setInterval(async () => {
+      await refetch();
+      
+      // Use aiService here
+      if (aiMonitoringEnabled && transactions.length > 0) {
+        const latestTx = transactions[0];
+        await aiService.validateTransaction(latestTx);
+      }
     }, monitoringInterval);
 
     return () => clearInterval(interval);
-  }, [isWatching, monitoringInterval, refetch]);
+  }, [isWatching, monitoringInterval, aiMonitoringEnabled, transactions]);
 
   // Generate alerts based on patterns
   useEffect(() => {
@@ -93,6 +105,33 @@ export const WalletWatcher: React.FC<WalletWatcherProps> = ({
       }
     });
   }, [suspiciousPatterns, addAlert, walletAddress]);
+
+  useEffect(() => {
+    const performAiAssessment = async () => {
+      if (aiMonitoringEnabled && transactions.length > 0) {
+        try {
+          const latestTransaction = transactions[0];
+          const context = {
+            sender: latestTransaction.from,
+            recipient: latestTransaction.to,
+            amount: latestTransaction.amount.toString(),
+            timestamp: latestTransaction.timestamp,
+            contractConfig: {},
+            senderHistory: [],
+            recipientHistory: [],
+            networkMetrics: {}
+          };
+          const assessment = await aiService.assessTransactionRisk(context);
+          setLastAiAssessment(assessment);
+          setAiAssessmentCount(prev => prev + 1);
+        } catch (error) {
+          console.error('AI assessment failed:', error);
+        }
+      }
+    };
+
+    performAiAssessment();
+  }, [transactions, aiMonitoringEnabled]);
 
   const handleStartWatching = async () => {
     try {
@@ -404,6 +443,96 @@ export const WalletWatcher: React.FC<WalletWatcherProps> = ({
                   </Flex>
                 </Box>
               )}
+            </Flex>
+          </Flex>
+        </Card>
+      )}
+
+      {/* AI-Powered Risk Assessment */}
+      {isWatching && walletAddress && aiMonitoringEnabled && (
+        <Card>
+          <Flex p="4" direction="column" gap="4">
+            <Flex align="center" gap="2">
+              <LightningBoltIcon style={{ width: '20px', height: '20px', color: 'var(--purple-9)' }} />
+              <Text size="5" weight="bold">AI Risk Assessment</Text>
+              <Badge color="purple" variant="soft">
+                {aiAssessmentCount} assessments
+              </Badge>
+            </Flex>
+
+            <Text size="2" color="gray">
+              Real-time AI analysis of transaction patterns and risk factors
+            </Text>
+
+            <AIRiskValidator
+              sender={walletAddress}
+              recipient={transactions.length > 0 ? transactions[0].to : "0x0000000000000000000000000000000000000000000000000000000000000000"}
+              amount={transactions.length > 0 ? transactions[0].amount.toString() : "0"}
+              enabled={aiMonitoringEnabled}
+              onRiskAssessment={(assessment) => {
+                setLastAiAssessment(assessment);
+                setAiAssessmentCount(prev => prev + 1);
+                
+                // Generate alert based on AI assessment
+                if (assessment.riskScore > 80) {
+                  addAlert({
+                    type: 'error',
+                    title: 'High AI Risk Detection',
+                    message: `AI detected high risk: ${assessment.reasoning}`,
+                    severity: 'high',
+                    autoClose: false,
+                  });
+                } else if (assessment.riskScore > 60) {
+                  addAlert({
+                    type: 'warning',
+                    title: 'Medium AI Risk Detection',
+                    message: `AI flagged potential risk: ${assessment.reasoning}`,
+                    severity: 'medium',
+                    autoClose: true,
+                    duration: 10000,
+                  });
+                }
+              }}
+            />
+
+            {lastAiAssessment && (
+              <Box 
+                p="3" 
+                style={{ 
+                  backgroundColor: 'var(--purple-2)', 
+                  borderRadius: '8px', 
+                  border: '1px solid var(--purple-6)' 
+                }}
+              >
+                <Flex direction="column" gap="2">
+                  <Flex justify="between" align="center">
+                    <Text size="2" weight="medium">Latest AI Assessment</Text>
+                    <Badge color="purple" variant="soft">
+                      {lastAiAssessment.model.toUpperCase()}
+                    </Badge>
+                  </Flex>
+                  <Text size="2" color="gray">
+                    Risk Score: {lastAiAssessment.riskScore}% | 
+                    Confidence: {lastAiAssessment.confidence}%
+                  </Text>
+                  <Text size="2">
+                    {lastAiAssessment.reasoning}
+                  </Text>
+                </Flex>
+              </Box>
+            )}
+
+            <Flex justify="between" align="center">
+              <Text size="2" color="gray">
+                AI monitoring powered by multiple models
+              </Text>
+              <Button
+                variant="soft"
+                size="1"
+                onClick={() => setAiMonitoringEnabled(!aiMonitoringEnabled)}
+              >
+                {aiMonitoringEnabled ? 'Disable AI' : 'Enable AI'}
+              </Button>
             </Flex>
           </Flex>
         </Card>

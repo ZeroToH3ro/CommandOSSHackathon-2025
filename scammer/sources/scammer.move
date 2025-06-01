@@ -24,6 +24,7 @@ module scammer::scammer {
         whitelisted_addresses: vector<address>,
         transaction_history: Table<address, TransactionRecord>,
         risk_thresholds: RiskThresholds,
+        ai_config: AIConfig,
         monitoring_enabled: bool,
     }
 
@@ -48,6 +49,18 @@ module scammer::scammer {
         contract_interaction_threshold: u8, // Percentage
         round_amount_threshold: u64,      // Number of round amount transactions
         unusual_time_threshold: u64,      // Hours for unusual activity
+    }
+
+    // ===== AI Configuration Struct =====
+    
+    /// AI configuration for risk assessment
+    public struct AIConfig has store, copy, drop {
+        enabled: bool,
+        risk_weight: u8,              // Weight given to AI risk score (0-100)
+        confidence_threshold: u8,      // Minimum confidence required (0-100)
+        max_response_time_ms: u64,    // Max time to wait for AI response
+        fallback_to_rule_based: bool, // Whether to fallback if AI fails
+        supported_models: vector<u8>, // Bitmask: 1=GPT, 2=Gemini, 4=Ollama
     }
 
     // ===== Events =====
@@ -136,6 +149,14 @@ module scammer::scammer {
                 contract_interaction_threshold: 70,
                 round_amount_threshold: 5,
                 unusual_time_threshold: 6, // 2-6 AM considered unusual
+            },
+            ai_config: AIConfig {
+                enabled: true,
+                risk_weight: 70,
+                confidence_threshold: 80,
+                max_response_time_ms: 2000,
+                fallback_to_rule_based: true,
+                supported_models: vector::empty(),
             },
             monitoring_enabled: true,
         };
@@ -401,6 +422,17 @@ module scammer::scammer {
         detector_state.monitoring_enabled = enabled;
     }
 
+    /// Update AI configuration (admin only)
+    public fun update_ai_config(
+        detector_state: &mut DetectorState,
+        new_ai_config: AIConfig,
+        ctx: &TxContext
+    ) {
+        assert!(tx_context::sender(ctx) == detector_state.admin, EUnauthorized);
+        
+        detector_state.ai_config = new_ai_config;
+    }
+
     // ===== Public View Functions =====
 
     /// Get admin address
@@ -450,7 +482,15 @@ module scammer::scammer {
         }
     }
 
-    // ===== Wallet Monitoring Functions (matches UI WalletWatcher) =====
+    /// Get AI configuration
+    public fun get_ai_config(detector_state: &DetectorState): AIConfig {
+        detector_state.ai_config
+    }
+
+    /// Get risk thresholds
+    public fun get_risk_thresholds(detector_state: &DetectorState): RiskThresholds {
+        detector_state.risk_thresholds
+    }
 
     /// Start monitoring a wallet
     public fun start_wallet_monitoring(
@@ -502,6 +542,14 @@ module scammer::scammer {
                 contract_interaction_threshold: 70,
                 round_amount_threshold: 5,
                 unusual_time_threshold: 6,
+            },
+            ai_config: AIConfig {
+                enabled: true,
+                risk_weight: 70,
+                confidence_threshold: 80,
+                max_response_time_ms: 2000,
+                fallback_to_rule_based: true,
+                supported_models: vector::empty(),
             },
             monitoring_enabled: true,
         }

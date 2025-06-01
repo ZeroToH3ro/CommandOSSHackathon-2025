@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useCurrentAccount } from '@mysten/dapp-kit';
 import { Box, Container, Grid, Heading, Text, Badge, Card, Flex, Button } from '@radix-ui/themes';
-import { SizeIcon, TriangleUpIcon, TriangleDownIcon } from '@radix-ui/react-icons';
+import { SizeIcon, TriangleUpIcon, TriangleDownIcon, LightningBoltIcon } from '@radix-ui/react-icons';
 import { TransactionList } from '../transactions/TransactionList';
 import { AlertBanner } from '../alerts/AlertBanner';
 import { MetricsCard } from './MetricsCard';
 import { TransactionChart } from './TransactionChart';
+import { EnhancedTransactionAnalyzer } from '../ai/EnhancedTransactionAnalyzer';
 import { useTransactionMonitoring } from '../../hooks/useTransactionMonitoring';
 import { usePatternDetection } from '../../hooks/usePatternDetection';
 import { useAlerts } from '../../hooks/useAlerts';
@@ -214,6 +215,29 @@ export function Dashboard() {
           showRiskIndicators={true}
         />
       </Card>
+
+      {/* AI-Powered Insights */}
+      {transactions.length > 0 && (
+        <Card className="p-6">
+          <Flex align="center" gap="2" className="mb-4">
+            <LightningBoltIcon className="w-5 h-5 text-purple-600" />
+            <Heading size="5">AI-Powered Risk Assessment</Heading>
+            <Badge color="purple" variant="soft">Beta</Badge>
+          </Flex>
+          <Text size="2" color="gray" className="mb-4">
+            Enhanced transaction analysis using multiple AI models for comprehensive risk assessment
+          </Text>
+          <EnhancedTransactionAnalyzer
+            sender={account.address}
+            recipient={transactions[0].to}
+            amount={transactions[0].amount.toString()}
+            onAnalysisComplete={(result) => {
+              console.log('AI Analysis Complete:', result);
+              // You could add this to state to display insights
+            }}
+          />
+        </Card>
+      )}
     </Container>
   );
 }

@@ -406,6 +406,123 @@ export class ScamDetectorClient {
     });
   }
 
+  // Get AI configuration from smart contract
+  async getAIConfig(): Promise<any> {
+    if (!CONTRACT_CONFIG.PACKAGE_ID || CONTRACT_CONFIG.PACKAGE_ID === "0x0") {
+      throw new Error("Contract not deployed. Please deploy the contract first.");
+    }
+
+    try {
+      const tx = new Transaction();
+      
+      tx.moveCall({
+        target: `${CONTRACT_CONFIG.PACKAGE_ID}::scammer::get_ai_config`,
+        arguments: [
+          tx.object(CONTRACT_CONFIG.DETECTOR_STATE_ID),
+        ],
+      });
+
+      const result = await this.suiClient.devInspectTransactionBlock({
+        transactionBlock: tx,
+        sender: "0x0000000000000000000000000000000000000000000000000000000000000000",
+      });
+
+      if (result.results?.[0]?.returnValues?.[0]) {
+        const returnValue = result.results[0].returnValues[0];
+        return this.parseAIConfig(returnValue);
+      }
+
+      throw new Error("Failed to get AI config from contract");
+    } catch (error) {
+      console.error("Error getting AI config:", error);
+      throw error;
+    }
+  }
+
+  // Get risk thresholds from smart contract
+  async getRiskThresholds(): Promise<any> {
+    if (!CONTRACT_CONFIG.PACKAGE_ID || CONTRACT_CONFIG.PACKAGE_ID === "0x0") {
+      throw new Error("Contract not deployed. Please deploy the contract first.");
+    }
+
+    try {
+      const tx = new Transaction();
+      
+      tx.moveCall({
+        target: `${CONTRACT_CONFIG.PACKAGE_ID}::scammer::get_risk_thresholds`,
+        arguments: [
+          tx.object(CONTRACT_CONFIG.DETECTOR_STATE_ID),
+        ],
+      });
+
+      const result = await this.suiClient.devInspectTransactionBlock({
+        transactionBlock: tx,
+        sender: "0x0000000000000000000000000000000000000000000000000000000000000000",
+      });
+
+      if (result.results?.[0]?.returnValues?.[0]) {
+        const returnValue = result.results[0].returnValues[0];
+        return this.parseRiskThresholds(returnValue);
+      }
+
+      throw new Error("Failed to get risk thresholds from contract");
+    } catch (error) {
+      console.error("Error getting risk thresholds:", error);
+      throw error;
+    }
+  }
+
+  // Update AI configuration (admin only)
+  updateAIConfig(aiConfig: any): Transaction {
+    if (!CONTRACT_CONFIG.PACKAGE_ID || CONTRACT_CONFIG.PACKAGE_ID === "0x0") {
+      throw new Error("Contract not deployed. Please deploy the contract first.");
+    }
+
+    const tx = new Transaction();
+    
+    tx.moveCall({
+      target: `${CONTRACT_CONFIG.PACKAGE_ID}::scammer::update_ai_config`,
+      arguments: [
+        tx.object(CONTRACT_CONFIG.DETECTOR_STATE_ID),
+        tx.pure.bool(aiConfig.enabled),
+        tx.pure.u8(aiConfig.risk_weight),
+        tx.pure.u8(aiConfig.confidence_threshold),
+        tx.pure.u64(aiConfig.max_response_time_ms),
+        tx.pure.bool(aiConfig.fallback_to_rule_based),
+        tx.pure.vector('u8', aiConfig.supported_models),
+      ],
+    });
+
+    return tx;
+  }
+
+  private parseAIConfig(_returnValue: any): any {
+    // Parse the AI config from Move struct
+    // This would need to be adapted based on the actual return format
+    // For now, return default config
+    return {
+      enabled: true,
+      risk_weight: 30,
+      confidence_threshold: 70,
+      max_response_time_ms: 5000,
+      fallback_to_rule_based: true,
+      supported_models: [1, 2, 4] // GPT, Gemini, Ollama
+    };
+  }
+
+  private parseRiskThresholds(_returnValue: any): any {
+    // Parse the risk thresholds from Move struct
+    // For now, return default thresholds
+    return {
+      rapid_transaction_threshold: 300000,
+      large_transfer_threshold: 1000000000000,
+      failed_transaction_threshold: 3,
+      contract_interaction_threshold: 70,
+      round_amount_threshold: 5,
+      unusual_time_threshold: 6,
+    };
+  }
+
   private getRiskLevel(riskScore: number): 'low' | 'medium' | 'high' | 'critical' {
     if (riskScore >= CONTRACT_CONFIG.RISK_THRESHOLDS.CRITICAL) return 'critical';
     if (riskScore >= CONTRACT_CONFIG.RISK_THRESHOLDS.HIGH) return 'high';

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ConnectButton, useCurrentAccount } from "@mysten/dapp-kit";
-import { Box, Container, Flex, Heading, Tabs, Badge, Text } from "@radix-ui/themes";
+import { Box, Container, Flex, Heading, Tabs, Badge, Text, Card } from "@radix-ui/themes";
 import { SizeIcon, ActivityLogIcon, BarChartIcon, ExclamationTriangleIcon, GearIcon } from "@radix-ui/react-icons";
 import { WalletStatus } from "./WalletStatus";
 import { Dashboard } from "./components/dashboard/Dashboard";
@@ -8,6 +8,9 @@ import { WalletWatcher } from "./components/monitoring/WalletWatcher";
 import { TransactionFilter } from "./components/transactions/TransactionFilter";
 import { AlertList } from "./components/alerts/AlertList";
 import { AdminPanel } from "./components/admin";
+import { DetectorStatus } from "./components/admin/DetectorStatus";
+import { AIRiskValidator } from "./components/ai/AIRiskValidator";
+import { AIConfigurationPanel } from "./components/ai/AIConfigurationPanel";
 import { useAlerts } from "./hooks/useAlerts";
 import { useTransactionMonitoring } from "./hooks/useTransactionMonitoring";
 import { useScamDetector } from "./hooks/useScamDetector";
@@ -289,6 +292,39 @@ function App() {
               <Tabs.Content value="admin">
                 <Flex direction="column" gap="6">
                   <AdminPanel />
+                </Flex>
+              </Tabs.Content>
+
+              <Tabs.Content value="status">
+                <Flex direction="column" gap="6">
+                  <Box>
+                    <Heading size="6" mb="2">AI Risk Assessment Status</Heading>
+                    <Text color="gray" size="3">
+                      Monitor AI services and configuration for real-time risk assessment
+                    </Text>
+                  </Box>
+                  
+                  <DetectorStatus />
+                  
+                  <AIConfigurationPanel />
+                  
+                  {/* AI Demo Section for testing */}
+                  {currentAccount && (
+                    <Card>
+                      <Flex p="4" direction="column" gap="4">
+                        <Heading size="4">Test AI Risk Assessment</Heading>
+                        <Text size="2" color="gray">
+                          Test the AI risk validation with sample transaction data
+                        </Text>
+                        <AIRiskValidator
+                          sender={currentAccount.address}
+                          recipient="0x1234567890abcdef1234567890abcdef12345678"
+                          amount="100"
+                          enabled={true}
+                        />
+                      </Flex>
+                    </Card>
+                  )}
                 </Flex>
               </Tabs.Content>
             </Tabs.Root>
