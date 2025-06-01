@@ -53,7 +53,6 @@ export function useScamDetector() {
   const suiClient = useSuiClient();
   const scamDetectorClient = new ScamDetectorClient(suiClient);
 
-  // Check if contract is deployed and fetch admin address
   useEffect(() => {
     const isDeployed = CONTRACT_CONFIG.PACKAGE_ID !== "0x0" && CONTRACT_CONFIG.DETECTOR_STATE_ID !== "0x0";
     setContractDeployed(isDeployed);
@@ -61,7 +60,6 @@ export function useScamDetector() {
     if (!isDeployed) {
       console.warn("Scam detector contract not deployed. Please deploy the contract and update the configuration.");
     } else {
-      // Fetch admin address when contract is deployed
       fetchAdminAddress();
     }
   }, []);

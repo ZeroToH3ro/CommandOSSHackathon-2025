@@ -42,21 +42,38 @@ export const AlertList: React.FC<AlertListProps> = ({
       case 'low':
         return 'blue';
       default:
-        return 'gray';
+        return 'ruby';
     }
   };
 
   const getCardStyle = (severity: Alert['severity']) => {
+    // Using inline styles for better contrast and visibility
+    const baseStyle = {
+      borderLeft: '4px solid #16a34a', // Strong green border
+      backgroundColor: '#f0fdf4', // Very light green background
+      border: '1px solid #bbf7d0', // Light green border
+    };
+
     switch (severity) {
       case 'critical':
       case 'high':
-        return 'border-l-4 border-l-red-500 bg-red-50';
+        return {
+          ...baseStyle,
+          borderLeft: '4px solid #dc2626', // Red border for high severity
+          backgroundColor: '#fef2f2', // Light red background
+          border: '1px solid #fecaca',
+        };
       case 'medium':
-        return 'border-l-4 border-l-orange-500 bg-orange-50';
+        return {
+          ...baseStyle,
+          borderLeft: '4px solid #d97706', // Orange border for medium severity
+          backgroundColor: '#fffbeb', // Light orange background
+          border: '1px solid #fed7aa',
+        };
       case 'low':
-        return 'border-l-4 border-l-blue-500 bg-blue-50';
+        return baseStyle;
       default:
-        return 'border-l-4 border-l-gray-500 bg-gray-50';
+        return baseStyle;
     }
   };
 
@@ -81,7 +98,7 @@ export const AlertList: React.FC<AlertListProps> = ({
         <Flex p="6" direction="column" align="center" gap="3">
           <CheckCircledIcon className="w-12 h-12 text-green-600" />
           <Text size="5" weight="bold">All Clear</Text>
-          <Text size="3" color="gray" align="center">
+          <Text size="3" align="center">
             No security alerts detected. Your wallet appears to be safe.
           </Text>
         </Flex>
@@ -115,25 +132,25 @@ export const AlertList: React.FC<AlertListProps> = ({
         {/* Alert List */}
         <Flex direction="column" gap="3">
           {displayedAlerts.map((alert) => (
-            <Card key={alert.id} className={getCardStyle(alert.severity)}>
+            <Card key={alert.id} style={getCardStyle(alert.severity)}>
               <Flex p="4" justify="between" align="start">
                 <Flex gap="3" className="flex-1">
                   {getAlertIcon(alert.type, alert.severity)}
                   
                   <Box className="flex-1">
                     <Flex align="center" gap="2" mb="2">
-                      <Text size="3" weight="bold">{alert.title}</Text>
+                      <Text size="3" weight="bold" style={{ color: '#111827' }}>{alert.title}</Text>
                       <Badge color={getBadgeColor(alert.severity)} size="1">
                         {alert.severity.toUpperCase()}
                       </Badge>
                     </Flex>
                     
-                    <Text size="2" color="gray" className="mb-3">
+                    <Text size="2" style={{ color: '#374151', marginBottom: '12px' }}>
                       {alert.message}
                     </Text>
                     
                     {showTimestamps && (
-                      <Flex align="center" gap="4" className="text-xs text-gray-500">
+                      <Flex align="center" gap="4" className="text-xs">
                         <Flex align="center" gap="1">
                           <ClockIcon className="w-3 h-3" />
                           <Text size="1" color="gray">
@@ -148,38 +165,54 @@ export const AlertList: React.FC<AlertListProps> = ({
                     
                     {/* Additional alert data */}
                     {alert.data && (
-                      <Box mt="3" p="3" style={{ backgroundColor: 'var(--gray-2)', borderRadius: '6px' }}>
+                      <Box mt="3" p="3" style={{ 
+                        backgroundColor: '#f9fafb', 
+                        borderRadius: '6px', 
+                        border: '1px solid #e5e7eb' 
+                      }}>
                         <details>
                           <summary style={{ cursor: 'pointer' }}>
-                            <Text size="2" color="gray">View Details</Text>
+                            <Text size="2" weight="medium" style={{ color: '#111827' }}>View Details</Text>
                           </summary>
                           <Box mt="2" className="space-y-1">
                             {alert.data.pattern && (
-                              <Flex gap="2">
-                                <Text size="1" weight="bold">Pattern:</Text>
-                                <Text size="1">{alert.data.pattern.type}</Text>
+                              <Flex gap="2" align="center">
+                                <Text size="1" weight="bold" style={{ color: '#111827' }}>Pattern:</Text>
+                                <Text size="1" style={{ color: '#374151' }}>{alert.data.pattern.type}</Text>
                               </Flex>
                             )}
                             {alert.data.walletAddress && (
-                              <Flex gap="2">
-                                <Text size="1" weight="bold">Wallet:</Text>
-                                <Text size="1" style={{ fontFamily: 'monospace' }}>
+                              <Flex gap="2" align="center">
+                                <Text size="1" weight="bold" style={{ color: '#111827' }}>Wallet:</Text>
+                                <Text size="1" style={{ 
+                                  fontFamily: 'monospace', 
+                                  backgroundColor: '#e5e7eb', 
+                                  padding: '2px 4px', 
+                                  borderRadius: '3px',
+                                  color: '#111827'
+                                }}>
                                   {alert.data.walletAddress.slice(0, 8)}...{alert.data.walletAddress.slice(-8)}
                                 </Text>
                               </Flex>
                             )}
                             {alert.data.transactionId && (
-                              <Flex gap="2">
-                                <Text size="1" weight="bold">Transaction:</Text>
-                                <Text size="1" style={{ fontFamily: 'monospace' }}>
+                              <Flex gap="2" align="center">
+                                <Text size="1" weight="bold" style={{ color: '#111827' }}>Transaction:</Text>
+                                <Text size="1" style={{ 
+                                  fontFamily: 'monospace', 
+                                  backgroundColor: '#e5e7eb', 
+                                  padding: '2px 4px', 
+                                  borderRadius: '3px',
+                                  color: '#111827'
+                                }}>
                                   {alert.data.transactionId.slice(0, 8)}...{alert.data.transactionId.slice(-8)}
                                 </Text>
                               </Flex>
                             )}
                             {alert.data.amount && (
-                              <Flex gap="2">
-                                <Text size="1" weight="bold">Amount:</Text>
-                                <Text size="1">{alert.data.amount} SUI</Text>
+                              <Flex gap="2" align="center">
+                                <Text size="1" weight="bold" style={{ color: '#111827' }}>Amount:</Text>
+                                <Text size="1" weight="medium" style={{ color: '#374151' }}>{alert.data.amount} SUI</Text>
                               </Flex>
                             )}
                           </Box>
@@ -195,6 +228,7 @@ export const AlertList: React.FC<AlertListProps> = ({
                     size="1"
                     onClick={() => onDismiss(alert.id)}
                     className="shrink-0"
+                    color="gray"
                   >
                     <Cross1Icon className="w-4 h-4" />
                   </Button>

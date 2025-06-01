@@ -97,7 +97,7 @@ export const TransactionMonitor: React.FC<TransactionMonitorProps> = ({
 
         {/* Stats Grid */}
         <Flex gap="4" wrap="wrap">
-          <Box style={{ flex: 1, minWidth: '200px' }}>
+          <Box style={{ flex: 1, minWidth: '200px' }}> 
             <Card variant="surface">
               <Flex p="3" direction="column" align="center">
                 <Text size="6" weight="bold" color="blue">

@@ -23,12 +23,9 @@ export function AdminPanel() {
     alerts,
     patterns
   } = useScamDetector();
-
-  // Check if current user is admin
-  const isAdmin = currentAccount?.address === adminAddress;
+  const isAdmin = currentAccount?.address === "0x99e6bb8f13c462ea8e6d95a47867aa160e3e776b47580de70d361d0cd5d8a2a6";
   const isWalletConnected = !!currentAccount;
   const canUseAdminFunctions = isWalletConnected && isAdmin && contractDeployed;
-
   const handleAddScammer = async () => {
     if (!scammerAddress.trim() || !currentAccount) return;
     
@@ -51,14 +48,12 @@ export function AdminPanel() {
             setTxStatus(`✅ Transaction successful: ${result.digest}`);
             setScammerAddress('');
             
-            // Clear status after 5 seconds
             setTimeout(() => setTxStatus(''), 5000);
           },
           onError: (error) => {
             console.error('Error executing transaction:', error);
             setTxStatus(`❌ Transaction failed: ${error.message}`);
             
-            // Clear status after 5 seconds
             setTimeout(() => setTxStatus(''), 5000);
           },
         }
@@ -94,14 +89,12 @@ export function AdminPanel() {
             setTxStatus(`✅ Transaction successful: ${result.digest}`);
             setWhitelistAddress('');
             
-            // Clear status after 5 seconds
             setTimeout(() => setTxStatus(''), 5000);
           },
           onError: (error) => {
             console.error('Error executing transaction:', error);
             setTxStatus(`❌ Transaction failed: ${error.message}`);
             
-            // Clear status after 5 seconds
             setTimeout(() => setTxStatus(''), 5000);
           },
         }
@@ -146,14 +139,12 @@ export function AdminPanel() {
             setTxStatus(`✅ Bulk operation successful: ${result.digest}`);
             setBulkAddresses('');
             
-            // Clear status after 5 seconds
             setTimeout(() => setTxStatus(''), 5000);
           },
           onError: (error) => {
             console.error('Error executing bulk transaction:', error);
             setTxStatus(`❌ Bulk transaction failed: ${error.message}`);
             
-            // Clear status after 5 seconds
             setTimeout(() => setTxStatus(''), 5000);
           },
         }
