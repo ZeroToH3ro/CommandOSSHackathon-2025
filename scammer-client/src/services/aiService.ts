@@ -236,7 +236,7 @@ export class AIService {
         throw new Error('No Ollama models available. Please pull a model first (e.g., ollama pull llama2)');
       }
 
-      const preferredModels = ['llama3', 'mistral', 'codellama', 'llama2'];
+      const preferredModels = ['llama2', 'mistral', 'codellama', 'llama3'];
       let selectedModel = availableModels[0].name;
       
       for (const preferred of preferredModels) {

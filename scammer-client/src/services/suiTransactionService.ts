@@ -46,27 +46,85 @@ export class SuiTransactionService {
       return [];
     }
 
-    try {
-      const response = await this.suiClient.queryTransactionBlocks({
-        filter: {
-          FromAddress: address,
-        },
-        limit,
-        order: 'descending',
-        options: {
-          showInput: true,
-          showEffects: true,
-          showEvents: true,
-          showObjectChanges: true,
-        },
-      });
+    // Try multiple query strategies in order of preference
+    const strategies = [
+      // Strategy 1: Use the newer filter format
+      async () => {
+        const response = await this.suiClient.queryTransactionBlocks({
+          filter: {
+            FromAddress: address,
+          },
+          limit,
+          order: 'descending',
+          options: {
+            showInput: true,
+            showEffects: true,
+            showEvents: true,
+            showObjectChanges: true,
+          },
+        });
+        return response.data.map(tx => this.parseTransactionData(tx));
+      },
+      
+      // Strategy 2: Use InputObject filter (for transactions that use objects owned by the address)
+      async () => {
+        const response = await this.suiClient.queryTransactionBlocks({
+          filter: {
+            InputObject: address,
+          },
+          limit,
+          order: 'descending',
+          options: {
+            showInput: true,
+            showEffects: true,
+            showEvents: true,
+            showObjectChanges: true,
+          },
+        });
+        return response.data.map(tx => this.parseTransactionData(tx));
+      },
+      
+      // Strategy 3: Use ChangedObject filter
+      async () => {
+        const response = await this.suiClient.queryTransactionBlocks({
+          filter: {
+            ChangedObject: address,
+          },
+          limit,
+          order: 'descending',
+          options: {
+            showInput: true,
+            showEffects: true,
+            showEvents: true,
+            showObjectChanges: true,
+          },
+        });
+        return response.data.map(tx => this.parseTransactionData(tx));
+      },
+      
+      // Strategy 4: General query and filter client-side
+      async () => {
+        return await this.getTransactionsByGeneralQuery(address, limit, 'sent');
+      }
+    ];
 
-      return response.data.map(tx => this.parseTransactionData(tx));
-    } catch (error) {
-      console.error('Error fetching transaction history:', error);
-      // If the filter doesn't work, return empty array instead of crashing
-      return [];
+    for (let i = 0; i < strategies.length; i++) {
+      try {
+        console.log(`Trying transaction query strategy ${i + 1} for address:`, address);
+        const transactions = await strategies[i]();
+        
+        if (transactions && transactions.length > 0) {
+          console.log(`Strategy ${i + 1} succeeded, found ${transactions.length} transactions`);
+          return transactions;
+        }
+      } catch (error) {
+        console.log(`Strategy ${i + 1} failed:`, error instanceof Error ? error.message : error);
+        continue;
+      }
     }
+
+    console.log('All strategies failed, returning empty array');
+    return [];
   }
 
   /**
@@ -81,27 +139,67 @@ export class SuiTransactionService {
       return [];
     }
 
-    try {
-      const response = await this.suiClient.queryTransactionBlocks({
-        filter: {
-          ToAddress: address,
-        },
-        limit,
-        order: 'descending',
-        options: {
-          showInput: true,
-          showEffects: true,
-          showEvents: true,
-          showObjectChanges: true,
-        },
-      });
+    // Try multiple query strategies in order of preference
+    const strategies = [
+      // Strategy 1: Use ToAddress filter
+      async () => {
+        const response = await this.suiClient.queryTransactionBlocks({
+          filter: {
+            ToAddress: address,
+          },
+          limit,
+          order: 'descending',
+          options: {
+            showInput: true,
+            showEffects: true,
+            showEvents: true,
+            showObjectChanges: true,
+          },
+        });
+        return response.data.map(tx => this.parseTransactionData(tx));
+      },
+      
+      // Strategy 2: Use ChangedObject filter
+      async () => {
+        const response = await this.suiClient.queryTransactionBlocks({
+          filter: {
+            ChangedObject: address,
+          },
+          limit,
+          order: 'descending',
+          options: {
+            showInput: true,
+            showEffects: true,
+            showEvents: true,
+            showObjectChanges: true,
+          },
+        });
+        return response.data.map(tx => this.parseTransactionData(tx));
+      },
+      
+      // Strategy 3: General query and filter client-side
+      async () => {
+        return await this.getTransactionsByGeneralQuery(address, limit, 'received');
+      }
+    ];
 
-      return response.data.map(tx => this.parseTransactionData(tx));
-    } catch (error) {
-      console.error('Error fetching incoming transactions:', error);
-      // If the filter doesn't work, return empty array instead of crashing
-      return [];
+    for (let i = 0; i < strategies.length; i++) {
+      try {
+        console.log(`Trying incoming transaction query strategy ${i + 1} for address:`, address);
+        const transactions = await strategies[i]();
+        
+        if (transactions && transactions.length > 0) {
+          console.log(`Strategy ${i + 1} succeeded, found ${transactions.length} incoming transactions`);
+          return transactions;
+        }
+      } catch (error) {
+        console.log(`Incoming strategy ${i + 1} failed:`, error instanceof Error ? error.message : error);
+        continue;
+      }
     }
+
+    console.log('All incoming transaction strategies failed, returning empty array');
+    return [];
   }
 
   /**
@@ -138,12 +236,10 @@ export class SuiTransactionService {
         console.log('Failed to get received transactions:', receivedResult.reason);
       }
 
-      // If both methods failed, try a general query approach
       if (sent.length === 0 && received.length === 0) {
         try {
-          // Get recent transactions without specific filters
           const generalResponse = await this.suiClient.queryTransactionBlocks({
-            limit: Math.min(limit, 50), // Reduced limit for general query
+            limit: Math.min(limit, 50),
             order: 'descending',
             options: {
               showInput: true,
@@ -206,12 +302,49 @@ export class SuiTransactionService {
       // Try to extract payment information from programmable transaction
       const commands = txData.transaction.transactions || [];
       for (const command of commands) {
-        if (command && typeof command === 'object' && 'TransferObjects' in command) {
-          // This is a transfer
-          type = 'payment';
-          // Extract recipient and amount if possible
-          break;
+        if (command && typeof command === 'object') {
+          if ('TransferObjects' in command) {
+            // This is a transfer
+            type = 'payment';
+            // Try to extract recipient from the command
+            try {
+              const transferCommand = command as any;
+              if (transferCommand.TransferObjects && transferCommand.TransferObjects.length > 1) {
+                // The last element is usually the recipient
+                const recipientInput = transferCommand.TransferObjects[transferCommand.TransferObjects.length - 1];
+                if (recipientInput && typeof recipientInput === 'object' && 'Input' in recipientInput) {
+                  // This is an input reference, we'd need to resolve it from the inputs
+                  // For now, we'll try to extract from effects
+                }
+              }
+            } catch (error) {
+              console.log('Error extracting transfer details:', error);
+            }
+            break;
+          } else if ('SplitCoins' in command || 'MergeCoins' in command) {
+            // These are also payment-related operations
+            type = 'payment';
+          }
         }
+      }
+      
+      // Try to extract recipient from transaction effects
+      try {
+        if (tx.effects?.created || tx.effects?.mutated) {
+          const changes = [...(tx.effects.created || []), ...(tx.effects.mutated || [])];
+          for (const change of changes) {
+            if (change.owner && typeof change.owner === 'object' && 'AddressOwner' in change.owner) {
+              // This object was created/modified for a specific address
+              const ownerAddress = change.owner.AddressOwner;
+              if (ownerAddress && ownerAddress !== sender) {
+                recipient = ownerAddress;
+                break;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.log('Error extracting recipient from effects:', error);
       }
     }
 
@@ -482,10 +615,70 @@ export class SuiTransactionService {
       return false;
     }
     
-    // Sui addresses are typically 64 characters long (32 bytes in hex)
-    // and start with 0x, but can also be shorter and get normalized
+    // Remove whitespace
+    address = address.trim();
+    
+    // Sui addresses can be in different formats:
+    // 1. Full format: 0x followed by 64 hex characters (32 bytes)
+    // 2. Shortened format: 0x followed by fewer hex characters
+    // 3. Without 0x prefix
+    
+    // Normalize the address
     const normalizedAddress = address.startsWith('0x') ? address : `0x${address}`;
+    
+    // Basic hex format validation
     const addressRegex = /^0x[a-fA-F0-9]+$/;
-    return addressRegex.test(normalizedAddress) && normalizedAddress.length >= 3;
+    if (!addressRegex.test(normalizedAddress)) {
+      return false;
+    }
+    
+    // Length validation - Sui addresses should be at least 3 characters (0x + 1 hex char)
+    // and at most 66 characters (0x + 64 hex characters)
+    const hexPart = normalizedAddress.slice(2);
+    return hexPart.length >= 1 && hexPart.length <= 64;
+  }
+
+  /**
+   * Helper method to get transactions by doing a general query and filtering client-side
+   */
+  private async getTransactionsByGeneralQuery(
+    address: string, 
+    limit: number, 
+    type: 'sent' | 'received'
+  ): Promise<TransactionData[]> {
+    try {
+      // Get a larger set of recent transactions and filter client-side
+      const response = await this.suiClient.queryTransactionBlocks({
+        limit: Math.min(limit * 10, 100), // Get more transactions to filter from
+        order: 'descending',
+        options: {
+          showInput: true,
+          showEffects: true,
+          showEvents: true,
+          showObjectChanges: true,
+        },
+      });
+
+      if (!response.data || response.data.length === 0) {
+        return [];
+      }
+
+      // Parse all transactions and filter for the specific address
+      const allTransactions = response.data.map(tx => this.parseTransactionData(tx));
+      
+      let filteredTransactions: TransactionData[] = [];
+      
+      if (type === 'sent') {
+        filteredTransactions = allTransactions.filter(tx => tx.sender === address);
+      } else if (type === 'received') {
+        filteredTransactions = allTransactions.filter(tx => tx.recipient === address);
+      }
+      
+      // Return only the requested number of transactions
+      return filteredTransactions.slice(0, limit);
+    } catch (error) {
+      console.error('Error in general query fallback:', error);
+      return [];
+    }
   }
 }

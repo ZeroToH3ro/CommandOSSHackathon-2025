@@ -4,7 +4,7 @@ export const CONTRACT_CONFIG = {
   DETECTOR_STATE_ID: import.meta.env.VITE_DETECTOR_STATE_ID || "0xd1a7e960346b2c57daf13df5d717bbfa4b5da760468477ecb414b87108a00fdf", // Detector AI state object
   
   // Network configuration
-  NETWORK: (import.meta.env.VITE_NETWORK as 'testnet' | 'devnet' | 'mainnet') || 'devnet',
+  NETWORK: (import.meta.env.VITE_NETWORK as 'devnet' | 'testnet' | 'mainnet') || 'devnet',
   
   // Contract constants (matching your Move contract)
   ALERT_TYPES: {
