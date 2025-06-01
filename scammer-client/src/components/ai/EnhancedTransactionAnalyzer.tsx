@@ -101,7 +101,7 @@ export function EnhancedTransactionAnalyzer({
       // 4. Get AI assessment
       let aiAssessment: AIRiskAssessment | null = null;
       try {
-        aiAssessment = await aiService.assessTransactionRisk(aiContext, 'gpt', 5000);
+        aiAssessment = await aiService.assessTransactionRisk(aiContext, 5000);
       } catch (aiError) {
         console.warn('AI assessment failed, using rule-based only:', aiError);
       }

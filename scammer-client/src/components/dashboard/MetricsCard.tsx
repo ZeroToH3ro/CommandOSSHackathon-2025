@@ -12,39 +12,47 @@ interface MetricsCardProps {
 export function MetricsCard({ title, value, trend, icon, loading }: MetricsCardProps) {
   if (loading) {
     return (
-      <Card className="p-6">
-        <Box className="animate-pulse">
-          <Box className="h-4 bg-gray-200 rounded mb-2"></Box>
-          <Box className="h-8 bg-gray-200 rounded mb-2"></Box>
-          <Box className="h-4 bg-gray-200 rounded w-1/2"></Box>
+      <Card style={{ padding: '24px' }}>
+        <Box style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}>
+          <Box style={{ height: '16px', backgroundColor: 'var(--gray-4)', borderRadius: '4px', marginBottom: '8px' }}></Box>
+          <Box style={{ height: '32px', backgroundColor: 'var(--gray-4)', borderRadius: '4px', marginBottom: '8px' }}></Box>
+          <Box style={{ height: '16px', backgroundColor: 'var(--gray-4)', borderRadius: '4px', width: '50%' }}></Box>
         </Box>
       </Card>
     );
   }
 
   return (
-    <Card className="p-6 hover:shadow-lg transition-shadow">
-      <Flex justify="between" align="start" className="mb-4">
-        <Text size="2" color="gray" className="uppercase tracking-wide">
+    <Card style={{ 
+      padding: '24px', 
+      transition: 'box-shadow 0.2s ease-in-out',
+      cursor: 'pointer'
+    }}>
+      <Flex justify="between" align="start" style={{ marginBottom: '16px' }}>
+        <Text size="2" color="gray" style={{ 
+          textTransform: 'uppercase', 
+          letterSpacing: '0.05em',
+          fontWeight: '500'
+        }}>
           {title}
         </Text>
         {icon && (
-          <Box className="text-gray-400">
+          <Box style={{ color: 'var(--gray-9)' }}>
             {icon}
           </Box>
         )}
       </Flex>
       
-      <Text size="7" weight="bold" className="block mb-2">
+      <Text size="7" weight="bold" style={{ display: 'block', marginBottom: '8px' }}>
         {value}
       </Text>
       
       {trend !== undefined && (
         <Flex align="center" gap="1">
           {trend > 0 ? (
-            <TriangleUpIcon className="w-4 h-4 text-green-500" />
+            <TriangleUpIcon style={{ width: '16px', height: '16px', color: 'var(--green-9)' }} />
           ) : (
-            <TriangleDownIcon className="w-4 h-4 text-red-500" />
+            <TriangleDownIcon style={{ width: '16px', height: '16px', color: 'var(--red-9)' }} />
           )}
           <Text size="2" color={trend > 0 ? 'green' : 'red'}>
             {Math.abs(trend).toFixed(1)}%

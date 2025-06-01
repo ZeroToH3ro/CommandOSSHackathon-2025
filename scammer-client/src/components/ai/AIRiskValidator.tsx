@@ -4,8 +4,7 @@ import {
   ExclamationTriangleIcon, 
   CheckCircledIcon, 
   CrossCircledIcon,
-  ClockIcon,
-  GearIcon
+  ClockIcon
 } from '@radix-ui/react-icons';
 import { aiService, AIRiskAssessment, TransactionContext } from '../../services/aiService';
 import { useScamDetector } from '../../hooks/useScamDetector';
@@ -28,34 +27,14 @@ export function AIRiskValidator({
   const [assessment, setAssessment] = useState<AIRiskAssessment | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState<'gpt' | 'gemini' | 'ollama'>('gpt');
 
   const { contractDeployed } = useScamDetector();
-
-  useEffect(() => {
-    checkAvailableModels();
-  }, []);
 
   useEffect(() => {
     if (enabled && sender && recipient && amount && contractDeployed) {
       performRiskAssessment();
     }
-  }, [sender, recipient, amount, enabled, contractDeployed, selectedModel]);
-
-  const checkAvailableModels = async () => {
-    try {
-      const models = await aiService.getAvailableModels();
-      setAvailableModels(models);
-      
-      // Set default model to first available
-      if (models.length > 0 && !models.includes(selectedModel)) {
-        setSelectedModel(models[0] as any);
-      }
-    } catch (error) {
-      console.error('Error checking available models:', error);
-    }
-  };
+  }, [sender, recipient, amount, enabled, contractDeployed]);
 
   const performRiskAssessment = async () => {
     if (!sender || !recipient || !amount) return;
@@ -83,7 +62,6 @@ export function AIRiskValidator({
 
       const result = await aiService.assessTransactionRisk(
         context,
-        selectedModel,
         5000 // 5 second timeout
       );
 
@@ -122,47 +100,11 @@ export function AIRiskValidator({
     );
   }
 
-  if (availableModels.length === 0) {
-    return (
-      <Card>
-        <Flex p="4" align="center" gap="3">
-          <ExclamationTriangleIcon style={{ width: '20px', height: '20px', color: 'var(--orange-9)' }} />
-          <Box>
-            <Text weight="medium" color="orange">No AI Models Available</Text>
-            <Text size="2" color="gray">
-              Configure API keys for OpenAI, Gemini, or Ollama to enable AI risk assessment
-            </Text>
-          </Box>
-        </Flex>
-      </Card>
-    );
-  }
-
   return (
     <Card>
       <Flex p="4" direction="column" gap="4">
         <Flex justify="between" align="center">
-          <Heading size="4">AI Risk Assessment</Heading>
-          <Flex gap="2" align="center">
-            <GearIcon style={{ width: '16px', height: '16px' }} />
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value as any)}
-              style={{
-                padding: '4px 8px',
-                borderRadius: '4px',
-                border: '1px solid var(--gray-6)',
-                backgroundColor: 'var(--gray-1)',
-                fontSize: '12px'
-              }}
-            >
-              {availableModels.map(model => (
-                <option key={model} value={model}>
-                  {model.toUpperCase()}
-                </option>
-              ))}
-            </select>
-          </Flex>
+          <Heading size="4">AI Risk Assessment (Ollama)</Heading>
         </Flex>
 
         {loading && (
@@ -235,7 +177,7 @@ export function AIRiskValidator({
               <Box mb="3">
                 <Text weight="medium" mb="2">Detected Patterns</Text>
                 <Flex gap="2" wrap="wrap">
-                  {assessment.patterns.map((pattern, index) => (
+                  {assessment.patterns.map((pattern: string, index: number) => (
                     <Badge key={index} color="orange" variant="soft" size="1">
                       {pattern.replace('_', ' ')}
                     </Badge>
@@ -249,7 +191,7 @@ export function AIRiskValidator({
               <Box>
                 <Text weight="medium" mb="2">Recommendations</Text>
                 <Box style={{ fontSize: '14px' }}>
-                  {assessment.recommendations.map((rec, index) => (
+                  {assessment.recommendations.map((rec: string, index: number) => (
                     <Text key={index} size="2" style={{ display: 'block', marginBottom: '4px' }}>
                       • {rec}
                     </Text>

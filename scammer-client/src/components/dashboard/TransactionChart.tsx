@@ -60,15 +60,21 @@ export function TransactionChart({ transactions, timeRange, loading }: Transacti
 
   if (loading) {
     return (
-      <Box className="h-48 flex items-center justify-center">
-        <Box className="animate-pulse w-full h-32 bg-gray-200 rounded"></Box>
+      <Box style={{ height: '192px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Box style={{ 
+          animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          width: '100%', 
+          height: '128px', 
+          backgroundColor: 'var(--gray-4)', 
+          borderRadius: '4px' 
+        }}></Box>
       </Box>
     );
   }
 
   if (chartData.length === 0) {
     return (
-      <Box className="h-48 flex items-center justify-center">
+      <Box style={{ height: '192px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Text color="gray">No transaction data available</Text>
       </Box>
     );
@@ -79,8 +85,8 @@ export function TransactionChart({ transactions, timeRange, loading }: Transacti
   ));
 
   return (
-    <Box className="h-48 relative">
-      <svg className="w-full h-full" viewBox="0 0 400 200">
+    <Box style={{ height: '192px', position: 'relative' }}>
+      <svg style={{ width: '100%', height: '100%' }} viewBox="0 0 400 200">
         {/* Chart bars */}
         {chartData.map((data, index) => {
           const x = (index / chartData.length) * 380 + 10;
@@ -100,7 +106,7 @@ export function TransactionChart({ transactions, timeRange, loading }: Transacti
                 y={180 - sendHeight}
                 width={barWidth}
                 height={sendHeight}
-                fill="#ef4444"
+                fill="var(--red-9)"
                 opacity="0.8"
                 rx="1"
               />
@@ -110,7 +116,7 @@ export function TransactionChart({ transactions, timeRange, loading }: Transacti
                 y={180 - receiveHeight}
                 width={barWidth}
                 height={receiveHeight}
-                fill="#22c55e"
+                fill="var(--green-9)"
                 opacity="0.8"
                 rx="1"
               />
@@ -120,7 +126,7 @@ export function TransactionChart({ transactions, timeRange, loading }: Transacti
                 y={180 - contractHeight}
                 width={barWidth}
                 height={contractHeight}
-                fill="#3b82f6"
+                fill="var(--blue-9)"
                 opacity="0.8"
                 rx="1"
               />
@@ -130,7 +136,7 @@ export function TransactionChart({ transactions, timeRange, loading }: Transacti
                 y={180 - approvalHeight}
                 width={barWidth}
                 height={approvalHeight}
-                fill="#f59e0b"
+                fill="var(--orange-9)"
                 opacity="0.8"
                 rx="1"
               />
@@ -142,7 +148,7 @@ export function TransactionChart({ transactions, timeRange, loading }: Transacti
                 width={barWidth * 4 + spacing * 3 + 10}
                 height={180}
                 fill="transparent"
-                className="hover:fill-gray-100 hover:opacity-20"
+                style={{ cursor: 'pointer' }}
               >
                 <title>
                   {`Time: ${new Date(data.time).toLocaleTimeString()}
@@ -157,14 +163,14 @@ Approval: ${data.approval.toFixed(4)} SUI`}
         })}
         
         {/* Y-axis labels */}
-        <g className="text-xs fill-gray-500">
-          <text x="5" y="15" fontSize="10">{maxValue.toFixed(2)}</text>
-          <text x="5" y="95" fontSize="10">{(maxValue / 2).toFixed(2)}</text>
-          <text x="5" y="175" fontSize="10">0</text>
+        <g style={{ fontSize: '10px', fill: 'var(--gray-9)' }}>
+          <text x="5" y="15">{maxValue.toFixed(2)}</text>
+          <text x="5" y="95">{(maxValue / 2).toFixed(2)}</text>
+          <text x="5" y="175">0</text>
         </g>
         
         {/* Grid lines */}
-        <g stroke="#e5e7eb" strokeWidth="0.5" opacity="0.5">
+        <g stroke="var(--gray-6)" strokeWidth="0.5" opacity="0.5">
           <line x1="20" y1="20" x2="380" y2="20" />
           <line x1="20" y1="100" x2="380" y2="100" />
           <line x1="20" y1="180" x2="380" y2="180" />
@@ -172,27 +178,46 @@ Approval: ${data.approval.toFixed(4)} SUI`}
       </svg>
       
       {/* Enhanced Legend */}
-      <Box className="absolute bottom-0 right-0 flex gap-3 text-sm bg-white/90 p-2 rounded">
-        <Box className="flex items-center gap-1">
-          <Box className="w-3 h-3 bg-red-500 rounded"></Box>
+      <Box style={{ 
+        position: 'absolute', 
+        bottom: '8px', 
+        right: '8px', 
+        display: 'flex', 
+        gap: '12px', 
+        fontSize: '12px', 
+        backgroundColor: 'var(--color-background)',
+        padding: '8px',
+        borderRadius: '6px',
+        border: '1px solid var(--gray-6)'
+      }}>
+        <Box style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <Box style={{ width: '12px', height: '12px', backgroundColor: 'var(--red-9)', borderRadius: '2px' }}></Box>
           <Text size="1">Sent</Text>
         </Box>
-        <Box className="flex items-center gap-1">
-          <Box className="w-3 h-3 bg-green-500 rounded"></Box>
+        <Box style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <Box style={{ width: '12px', height: '12px', backgroundColor: 'var(--green-9)', borderRadius: '2px' }}></Box>
           <Text size="1">Received</Text>
         </Box>
-        <Box className="flex items-center gap-1">
-          <Box className="w-3 h-3 bg-blue-500 rounded"></Box>
+        <Box style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <Box style={{ width: '12px', height: '12px', backgroundColor: 'var(--blue-9)', borderRadius: '2px' }}></Box>
           <Text size="1">Contract</Text>
         </Box>
-        <Box className="flex items-center gap-1">
-          <Box className="w-3 h-3 bg-yellow-500 rounded"></Box>
+        <Box style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <Box style={{ width: '12px', height: '12px', backgroundColor: 'var(--orange-9)', borderRadius: '2px' }}></Box>
           <Text size="1">Approval</Text>
         </Box>
       </Box>
       
       {/* Chart summary */}
-      <Box className="absolute top-0 left-0 bg-white/90 p-2 rounded text-xs">
+      <Box style={{ 
+        position: 'absolute', 
+        top: '8px', 
+        left: '8px', 
+        backgroundColor: 'var(--color-background)',
+        padding: '8px',
+        borderRadius: '6px',
+        border: '1px solid var(--gray-6)'
+      }}>
         <Text size="1" color="gray">
           Total Transactions: {transactions.length}
         </Text>

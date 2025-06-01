@@ -41,6 +41,11 @@ export class SuiTransactionService {
     address: string, 
     limit: number = 10
   ): Promise<TransactionData[]> {
+    if (!this.isValidSuiAddress(address)) {
+      console.error('Invalid Sui address format:', address);
+      return [];
+    }
+
     try {
       const response = await this.suiClient.queryTransactionBlocks({
         filter: {
@@ -59,6 +64,7 @@ export class SuiTransactionService {
       return response.data.map(tx => this.parseTransactionData(tx));
     } catch (error) {
       console.error('Error fetching transaction history:', error);
+      // If the filter doesn't work, return empty array instead of crashing
       return [];
     }
   }
@@ -70,6 +76,11 @@ export class SuiTransactionService {
     address: string,
     limit: number = 10
   ): Promise<TransactionData[]> {
+    if (!this.isValidSuiAddress(address)) {
+      console.error('Invalid Sui address format:', address);
+      return [];
+    }
+
     try {
       const response = await this.suiClient.queryTransactionBlocks({
         filter: {
@@ -88,12 +99,14 @@ export class SuiTransactionService {
       return response.data.map(tx => this.parseTransactionData(tx));
     } catch (error) {
       console.error('Error fetching incoming transactions:', error);
+      // If the filter doesn't work, return empty array instead of crashing
       return [];
     }
   }
 
   /**
    * Get comprehensive transaction history (both sent and received)
+   * Uses fallback methods if specific filters don't work
    */
   async getComprehensiveHistory(
     address: string,
@@ -103,10 +116,60 @@ export class SuiTransactionService {
     received: TransactionData[];
     metrics: AddressMetrics;
   }> {
-    const [sent, received] = await Promise.all([
-      this.getAddressTransactionHistory(address, limit),
-      this.getIncomingTransactions(address, limit)
-    ]);
+    let sent: TransactionData[] = [];
+    let received: TransactionData[] = [];
+
+    try {
+      // Try to get both sent and received transactions
+      const [sentResult, receivedResult] = await Promise.allSettled([
+        this.getAddressTransactionHistory(address, limit),
+        this.getIncomingTransactions(address, limit)
+      ]);
+
+      if (sentResult.status === 'fulfilled') {
+        sent = sentResult.value;
+      } else {
+        console.log('Failed to get sent transactions:', sentResult.reason);
+      }
+
+      if (receivedResult.status === 'fulfilled') {
+        received = receivedResult.value;
+      } else {
+        console.log('Failed to get received transactions:', receivedResult.reason);
+      }
+
+      // If both methods failed, try a general query approach
+      if (sent.length === 0 && received.length === 0) {
+        try {
+          // Get recent transactions without specific filters
+          const generalResponse = await this.suiClient.queryTransactionBlocks({
+            limit: Math.min(limit, 50), // Reduced limit for general query
+            order: 'descending',
+            options: {
+              showInput: true,
+              showEffects: true,
+              showEvents: true,
+              showObjectChanges: true,
+            },
+          });
+
+          // Filter transactions that involve our address
+          const relevantTxs = generalResponse.data
+            .map(tx => this.parseTransactionData(tx))
+            .filter(tx => 
+              tx.sender === address || 
+              tx.recipient === address
+            );
+
+          sent = relevantTxs.filter(tx => tx.sender === address);
+          received = relevantTxs.filter(tx => tx.recipient === address);
+        } catch (error) {
+          console.log('General query also failed:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error in getComprehensiveHistory:', error);
+    }
 
     const allTransactions = [...sent, ...received]
       .sort((a, b) => b.timestamp - a.timestamp)
@@ -125,10 +188,10 @@ export class SuiTransactionService {
    * Parse Sui transaction data into our format
    */
   private parseTransactionData(tx: SuiTransactionBlockResponse): TransactionData {
-    const digest = tx.digest;
+    const digest = tx.digest || '';
     const timestampMs = tx.timestampMs ? parseInt(tx.timestampMs) : Date.now();
     
-    // Extract sender
+    // Extract sender with fallback
     const sender = tx.transaction?.data?.sender || '';
     
     // Determine transaction type and extract relevant data
@@ -152,19 +215,31 @@ export class SuiTransactionService {
       }
     }
 
-    // Extract gas information
-    const gasData = tx.effects?.gasUsed;
-    const gasUsed = gasData ? (
-      parseInt(gasData.computationCost || '0') +
-      parseInt(gasData.storageCost || '0') -
-      parseInt(gasData.storageRebate || '0')
-    ).toString() : '0';
+    // Extract gas information with better error handling
+    let gasUsed = '0';
+    try {
+      const gasData = tx.effects?.gasUsed;
+      if (gasData) {
+        const computationCost = parseInt(gasData.computationCost || '0');
+        const storageCost = parseInt(gasData.storageCost || '0');
+        const storageRebate = parseInt(gasData.storageRebate || '0');
+        gasUsed = (computationCost + storageCost - storageRebate).toString();
+      }
+    } catch (error) {
+      console.log('Error parsing gas data:', error);
+      gasUsed = '0';
+    }
 
     const gasBudget = txData?.gasData?.budget || '0';
     const gasPrice = txData?.gasData?.price || '0';
 
-    // Determine status
-    const status = tx.effects?.status?.status === 'success' ? 'success' : 'failure';
+    // Determine status with fallback
+    let status: 'success' | 'failure' = 'failure';
+    try {
+      status = tx.effects?.status?.status === 'success' ? 'success' : 'failure';
+    } catch (error) {
+      console.log('Error parsing transaction status:', error);
+    }
 
     return {
       digest,
@@ -282,25 +357,64 @@ export class SuiTransactionService {
    * Get address creation time (approximate)
    */
   async getAddressAge(address: string): Promise<number | null> {
-    try {
-      // Get the very first transaction for this address
-      const response = await this.suiClient.queryTransactionBlocks({
-        filter: {
-          FromAddress: address,
-        },
-        limit: 1,
-        order: 'ascending',
-        options: {
-          showInput: true,
-        },
-      });
+    if (!this.isValidSuiAddress(address)) {
+      console.error('Invalid Sui address format:', address);
+      return null;
+    }
 
-      if (response.data.length > 0) {
-        const firstTx = response.data[0];
-        return firstTx.timestampMs ? parseInt(firstTx.timestampMs) : null;
+    try {
+      // Try multiple approaches to get the first transaction
+      let firstTxTimestamp: number | null = null;
+
+      // Method 1: Try getting transactions from this address
+      try {
+        const sentResponse = await this.suiClient.queryTransactionBlocks({
+          filter: {
+            FromAddress: address,
+          },
+          limit: 1,
+          order: 'ascending',
+          options: {
+            showInput: true,
+          },
+        });
+
+        if (sentResponse.data.length > 0) {
+          const firstTx = sentResponse.data[0];
+          if (firstTx.timestampMs) {
+            firstTxTimestamp = parseInt(firstTx.timestampMs);
+          }
+        }
+      } catch (error) {
+        console.log('FromAddress query failed, trying alternative method');
       }
 
-      return null;
+      // Method 2: Try getting transactions to this address if first method failed
+      if (!firstTxTimestamp) {
+        try {
+          const receivedResponse = await this.suiClient.queryTransactionBlocks({
+            filter: {
+              ToAddress: address,
+            },
+            limit: 1,
+            order: 'ascending',
+            options: {
+              showInput: true,
+            },
+          });
+
+          if (receivedResponse.data.length > 0) {
+            const firstTx = receivedResponse.data[0];
+            if (firstTx.timestampMs) {
+              firstTxTimestamp = parseInt(firstTx.timestampMs);
+            }
+          }
+        } catch (error) {
+          console.log('ToAddress query also failed');
+        }
+      }
+
+      return firstTxTimestamp;
     } catch (error) {
       console.error('Error getting address age:', error);
       return null;
@@ -342,8 +456,14 @@ export class SuiTransactionService {
     });
 
     // Check if address is new (less than 7 days old)
-    const addressAge = await this.getAddressAge(address);
-    const newAddress = addressAge ? (Date.now() - addressAge) < (7 * 24 * 60 * 60 * 1000) : false;
+    let newAddress = false;
+    try {
+      const addressAge = await this.getAddressAge(address);
+      newAddress = addressAge ? (Date.now() - addressAge) < (7 * 24 * 60 * 60 * 1000) : false;
+    } catch (error) {
+      console.log('Could not determine address age, assuming not new');
+      newAddress = false;
+    }
 
     return {
       rapidTransactions,
@@ -352,5 +472,20 @@ export class SuiTransactionService {
       suspiciousAmounts,
       newAddress
     };
+  }
+
+  /**
+   * Validate if an address is a valid Sui address format
+   */
+  private isValidSuiAddress(address: string): boolean {
+    if (!address || typeof address !== 'string') {
+      return false;
+    }
+    
+    // Sui addresses are typically 64 characters long (32 bytes in hex)
+    // and start with 0x, but can also be shorter and get normalized
+    const normalizedAddress = address.startsWith('0x') ? address : `0x${address}`;
+    const addressRegex = /^0x[a-fA-F0-9]+$/;
+    return addressRegex.test(normalizedAddress) && normalizedAddress.length >= 3;
   }
 }

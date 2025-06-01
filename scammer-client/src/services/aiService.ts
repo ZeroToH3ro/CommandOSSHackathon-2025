@@ -1,5 +1,3 @@
-import OpenAI from 'openai';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Transaction } from '../types';
 
 // Define a simple interface for Ollama to avoid import issues
@@ -14,7 +12,7 @@ export interface AIRiskAssessment {
   reasoning: string;
   patterns: string[];
   recommendations: string[];
-  model: 'gpt' | 'gemini' | 'ollama';
+  model: 'ollama';
   processingTime: number;
 }
 
@@ -30,9 +28,11 @@ export interface TransactionContext {
 }
 
 export class AIService {
-  private openaiClient?: OpenAI;
-  private geminiClient?: GoogleGenerativeAI;
   private ollamaClient?: OllamaClient;
+  private requestQueue: Promise<any>[] = [];
+  private maxConcurrentRequests = 2;
+  private assessmentCache = new Map<string, { result: AIRiskAssessment; timestamp: number }>();
+  private cacheExpiry = 5 * 60 * 1000; // 5 minutes
 
   constructor() {
     // Initialize clients asynchronously
@@ -43,191 +43,183 @@ export class AIService {
 
   // Validate a transaction using AI assessment
   async validateTransaction(transaction: Transaction): Promise<AIRiskAssessment> {
-    const context: TransactionContext = {
-      sender: transaction.from,
-      recipient: transaction.to,
-      amount: transaction.amount.toString(),
-      timestamp: transaction.timestamp,
-      contractConfig: {},
-      senderHistory: [],
-      recipientHistory: [],
-      networkMetrics: {}
-    };
+    return this.queueRequest(async () => {
+      const context: TransactionContext = {
+        sender: transaction.from,
+        recipient: transaction.to,
+        amount: transaction.amount.toString(),
+        timestamp: transaction.timestamp,
+        contractConfig: {},
+        senderHistory: [],
+        recipientHistory: [],
+        networkMetrics: {}
+      };
 
-    return await this.assessTransactionRisk(context);
+      return await this.assessTransactionRisk(context);
+    });
   }
 
   // Analyze a transaction for patterns and risks
   async analyzeTransaction(transactionData: any): Promise<AIRiskAssessment> {
-    const context: TransactionContext = {
-      sender: transactionData.sender || '',
-      recipient: transactionData.recipient || '',
-      amount: transactionData.amount || '0',
-      timestamp: transactionData.timestamp || Date.now(),
-      contractConfig: transactionData.contractConfig || {},
-      senderHistory: transactionData.senderHistory || [],
-      recipientHistory: transactionData.recipientHistory || [],
-      networkMetrics: transactionData.networkMetrics || {}
-    };
+    return this.queueRequest(async () => {
+      const context: TransactionContext = {
+        sender: transactionData.sender || '',
+        recipient: transactionData.recipient || '',
+        amount: transactionData.amount || '0',
+        timestamp: transactionData.timestamp || Date.now(),
+        contractConfig: transactionData.contractConfig || {},
+        senderHistory: transactionData.senderHistory || [],
+        recipientHistory: transactionData.recipientHistory || [],
+        networkMetrics: transactionData.networkMetrics || {}
+      };
 
-    return await this.assessTransactionRisk(context);
+      return await this.assessTransactionRisk(context);
+    });
+  }
+
+  private async queueRequest<T>(request: () => Promise<T>): Promise<T> {
+    // Simple rate limiting - wait if too many concurrent requests
+    while (this.requestQueue.length >= this.maxConcurrentRequests) {
+      await Promise.race(this.requestQueue);
+    }
+
+    const requestPromise = request().finally(() => {
+      // Remove this request from the queue when it completes
+      const index = this.requestQueue.indexOf(requestPromise);
+      if (index > -1) {
+        this.requestQueue.splice(index, 1);
+      }
+    });
+
+    this.requestQueue.push(requestPromise);
+    return requestPromise;
   }
 
   private async initializeClients() {
-    // Initialize OpenAI if API key is available
-    const openaiKey = import.meta.env.VITE_OPENAI_API_KEY;
-    if (openaiKey) {
-      this.openaiClient = new OpenAI({
-        apiKey: openaiKey,
-        dangerouslyAllowBrowser: true
-      });
-    }
-
-    // Initialize Gemini if API key is available
-    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (geminiKey) {
-      this.geminiClient = new GoogleGenerativeAI(geminiKey);
-    }
-
     // Initialize Ollama with browser-safe approach
     const ollamaUrl = import.meta.env.VITE_OLLAMA_URL || 'http://localhost:11434';
     try {
       // Create a simple HTTP client for Ollama instead of using the library
       this.ollamaClient = {
         generate: async (options: any) => {
-          const response = await fetch(`${ollamaUrl}/api/generate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(options)
-          });
-          return response.json();
+          try {
+            const response = await fetch(`${ollamaUrl}/api/generate`, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify(options)
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            return result;
+          } catch (error) {
+            console.error('Ollama generate request failed:', error);
+            throw new Error(`Failed to connect to Ollama at ${ollamaUrl}: ${error}`);
+          }
         },
         list: async () => {
-          const response = await fetch(`${ollamaUrl}/api/tags`);
-          return response.json();
+          try {
+            const response = await fetch(`${ollamaUrl}/api/tags`, {
+              method: 'GET',
+              headers: { 'Accept': 'application/json' }
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+            }
+            
+            return response.json();
+          } catch (error) {
+            console.error('Ollama list request failed:', error);
+            throw new Error(`Failed to connect to Ollama at ${ollamaUrl}: ${error}`);
+          }
         }
       };
+      
+      // Test the connection
+      console.log('Testing Ollama connection...');
+      await this.ollamaClient.list();
+      console.log('Ollama client initialized successfully');
     } catch (error) {
       console.warn('Ollama client initialization failed:', error);
+      this.ollamaClient = undefined;
     }
   }
 
   async assessTransactionRisk(
     context: TransactionContext,
-    preferredModel: 'gpt' | 'gemini' | 'ollama' = 'gpt',
-    timeoutMs: number = 5000
+    timeoutMs: number = 100000
   ): Promise<AIRiskAssessment> {
     const startTime = Date.now();
 
-    try {
-      switch (preferredModel) {
-        case 'gpt':
-          if (!this.openaiClient) throw new Error('OpenAI not configured');
-          return await this.assessWithGPT(context, timeoutMs);
-        case 'gemini':
-          if (!this.geminiClient) throw new Error('Gemini not configured');
-          return await this.assessWithGemini(context, timeoutMs);
-        case 'ollama':
-          if (!this.ollamaClient) throw new Error('Ollama not configured');
-          return await this.assessWithOllama(context, timeoutMs);
-        default:
-          throw new Error(`Unsupported model: ${preferredModel}`);
-      }
-    } catch (error) {
-      console.error(`AI assessment failed with ${preferredModel}:`, error);
-      
-      // Try fallback to next available model
-      const fallbackModels = ['gpt', 'gemini', 'ollama'].filter(m => m !== preferredModel);
-      for (const fallback of fallbackModels) {
-        try {
-          const result = await this.assessTransactionRisk(context, fallback as any, timeoutMs);
-          return result;
-        } catch (fallbackError) {
-          console.warn(`Fallback to ${fallback} also failed:`, fallbackError);
-        }
-      }
-
-      // If all models fail, return a basic assessment
-      const processingTime = Date.now() - startTime;
+    // Create cache key based on context
+    const cacheKey = this.createCacheKey(context);
+    const cached = this.assessmentCache.get(cacheKey);
+    
+    // Return cached result if still valid
+    if (cached && (Date.now() - cached.timestamp) < this.cacheExpiry) {
+      console.log('Returning cached AI assessment');
       return {
-        riskScore: 50, // Neutral risk when AI fails
-        confidence: 20,
-        reasoning: 'AI assessment failed, using fallback scoring',
-        patterns: ['ai_failure'],
-        recommendations: ['Manual review recommended'],
-        model: preferredModel,
-        processingTime
+        ...cached.result,
+        processingTime: Date.now() - startTime
       };
     }
-  }
-
-  private async assessWithGPT(context: TransactionContext, timeoutMs: number): Promise<AIRiskAssessment> {
-    const startTime = Date.now();
-    
-    const prompt = this.buildAssessmentPrompt(context);
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const response = await this.openaiClient!.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert blockchain transaction analyst specializing in scam detection. Analyze transactions and provide risk assessments with numerical scores and detailed reasoning.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 1000
-      }, {
-        signal: controller.signal
+      let result: AIRiskAssessment;
+      console.log(`Ollama client: ${this.ollamaClient}`);
+      if (!this.ollamaClient) {
+        throw new Error('Ollama not configured');
+      }
+      
+      result = await this.assessWithOllama(context, timeoutMs);
+
+      // Cache the result
+      this.assessmentCache.set(cacheKey, {
+        result,
+        timestamp: Date.now()
       });
 
-      clearTimeout(timeoutId);
+      return result;
+    } catch (error: any) {
+      console.error(`AI assessment failed with Ollama:`, error);
       
-      const result = this.parseAIResponse(response.choices[0].message.content || '');
-      return {
-        ...result,
-        model: 'gpt',
-        processingTime: Date.now() - startTime
-      };
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw error;
+      // If Ollama fails, return a basic assessment
+      const processingTime = Date.now() - startTime;
+      return this.createFallbackAssessment('ollama', processingTime, error);
     }
   }
 
-  private async assessWithGemini(context: TransactionContext, timeoutMs: number): Promise<AIRiskAssessment> {
-    const startTime = Date.now();
+  private createCacheKey(context: TransactionContext): string {
+    // Create a simple cache key based on transaction details
+    return `${context.sender}-${context.recipient}-${context.amount}-${Math.floor(context.timestamp / 60000)}`; // Round to minute
+  }
+
+  private createFallbackAssessment(_model: string, processingTime: number, error: any): AIRiskAssessment {
+    // Determine risk score based on error type
+    let riskScore = 50; // Default neutral
+    let reasoning = 'AI assessment failed, using fallback scoring';
     
-    const model = this.geminiClient!.getGenerativeModel({ model: 'gemini-pro' });
-    const prompt = this.buildAssessmentPrompt(context);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-    try {
-      const result = await model.generateContent(prompt);
-      clearTimeout(timeoutId);
-      
-      const response = await result.response;
-      const text = response.text();
-      
-      const parsed = this.parseAIResponse(text);
-      return {
-        ...parsed,
-        model: 'gemini',
-        processingTime: Date.now() - startTime
-      };
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw error;
+    if (error?.message?.includes('timeout')) {
+      riskScore = 60; // Slightly higher risk for timeouts
+      reasoning = 'Assessment timed out - using moderate risk assessment';
     }
+
+    return {
+      riskScore,
+      confidence: 20,
+      reasoning,
+      patterns: ['ai_failure'],
+      recommendations: ['Manual review recommended due to AI service unavailability'],
+      model: 'ollama',
+      processingTime
+    };
   }
 
   private async assessWithOllama(context: TransactionContext, timeoutMs: number): Promise<AIRiskAssessment> {
@@ -236,24 +228,83 @@ export class AIService {
     const prompt = this.buildAssessmentPrompt(context);
 
     try {
-      const response = await Promise.race([
-        this.ollamaClient!.generate({
-          model: 'llama2', // or 'mistral', 'codellama', etc.
-          prompt,
-          stream: false
-        }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Ollama timeout')), timeoutMs)
-        )
-      ]) as any;
+      // Get available models first
+      const modelsResponse = await this.ollamaClient!.list();
+      const availableModels = modelsResponse?.models || [];
+      
+      if (availableModels.length === 0) {
+        throw new Error('No Ollama models available. Please pull a model first (e.g., ollama pull llama2)');
+      }
 
-      const parsed = this.parseAIResponse(response.response);
-      return {
-        ...parsed,
-        model: 'ollama',
-        processingTime: Date.now() - startTime
-      };
+      const preferredModels = ['llama3', 'mistral', 'codellama', 'llama2'];
+      let selectedModel = availableModels[0].name;
+      
+      for (const preferred of preferredModels) {
+        if (availableModels.some((m: any) => m.name.includes(preferred))) {
+          selectedModel = availableModels.find((m: any) => m.name.includes(preferred)).name;
+          break;
+        }
+      }
+
+      console.log(`Using Ollama model: ${selectedModel}`);
+
+      // Increase timeout and add abort controller for better control
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, timeoutMs);
+
+      try {
+        const response = await fetch('http://localhost:11434/api/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            model: selectedModel,
+            prompt,
+            stream: false,
+            options: {
+              temperature: 0.3,
+              num_predict: 1000,  // Reduced from 5000 for faster response
+              top_p: 0.9,
+              top_k: 40
+            }
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        
+        // Check if response exists and has the expected structure
+        if (!result || (!result.response && !result.content)) {
+          throw new Error('Invalid response from Ollama API');
+        }
+
+        const responseText = result.response || result.content || '';
+        const parsed = this.parseAIResponse(responseText);
+        return {
+          ...parsed,
+          model: 'ollama',
+          processingTime: Date.now() - startTime
+        };
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        
+        if (error.name === 'AbortError') {
+          throw new Error(`Ollama response timed out after ${timeoutMs}ms. Try using a smaller model or increase timeout.`);
+        }
+        throw error;
+      }
     } catch (error) {
+      console.error('Ollama assessment error:', error);
       throw error;
     }
   }
@@ -306,6 +357,18 @@ Provide specific, actionable insights based on the data.
   }
 
   private parseAIResponse(response: string): Omit<AIRiskAssessment, 'model' | 'processingTime'> {
+    // Handle null, undefined, or empty responses
+    if (!response || typeof response !== 'string') {
+      console.warn('Invalid AI response received:', response);
+      return {
+        riskScore: 50,
+        confidence: 20,
+        reasoning: 'Invalid response from AI model',
+        patterns: ['invalid_response'],
+        recommendations: ['Manual review recommended due to invalid AI response']
+      };
+    }
+
     try {
       // Try to extract JSON from the response
       const jsonMatch = response.match(/\{[\s\S]*\}/);
@@ -330,7 +393,7 @@ Provide specific, actionable insights based on the data.
     return {
       riskScore: Math.min(100, Math.max(0, riskScore)),
       confidence: Math.min(100, Math.max(0, confidence)),
-      reasoning: response.substring(0, 500) + '...',
+      reasoning: response.length > 500 ? response.substring(0, 500) + '...' : response,
       patterns: this.extractPatternsFromText(response),
       recommendations: this.extractRecommendationsFromText(response)
     };
@@ -377,29 +440,51 @@ Provide specific, actionable insights based on the data.
   async getAvailableModels(): Promise<string[]> {
     const available = [];
     
-    if (this.openaiClient) {
-      try {
-        await this.openaiClient.models.list();
-        available.push('gpt');
-      } catch (error) {
-        console.warn('OpenAI not available:', error);
-      }
-    }
-
-    if (this.geminiClient) {
-      available.push('gemini');
-    }
-
     if (this.ollamaClient) {
       try {
-        await this.ollamaClient.list();
-        available.push('ollama');
+        const result = await this.ollamaClient.list();
+        // Check if models are actually available
+        if (result && result.models && result.models.length > 0) {
+          available.push('ollama');
+        }
       } catch (error) {
         console.warn('Ollama not available:', error);
+        // Remove the client if it's not working
+        this.ollamaClient = undefined;
       }
     }
 
     return available;
+  }
+
+  // Check Ollama connection status
+  async checkOllamaStatus(): Promise<{connected: boolean, models: string[], error?: string}> {
+    const ollamaUrl = import.meta.env.VITE_OLLAMA_URL || 'http://localhost:11434';
+    
+    try {
+      if (!this.ollamaClient) {
+        return {
+          connected: false,
+          models: [],
+          error: 'Ollama client not initialized'
+        };
+      }
+
+      const result = await this.ollamaClient.list();
+      const models = result?.models?.map((m: any) => m.name) || [];
+      
+      return {
+        connected: true,
+        models,
+        error: models.length === 0 ? 'No models available. Please pull a model first (e.g., ollama pull llama2)' : undefined
+      };
+    } catch (error) {
+      return {
+        connected: false,
+        models: [],
+        error: `Cannot connect to Ollama at ${ollamaUrl}. Please ensure Ollama is running.`
+      };
+    }
   }
 }
 

@@ -25,26 +25,42 @@ export function AlertBanner({ alert, onDismiss }: AlertBannerProps) {
   const getAlertColors = (type: Alert['type']) => {
     switch (type) {
       case 'error':
-        return 'bg-red-50 border-red-200 text-red-800';
+        return {
+          backgroundColor: 'var(--red-2)',
+          borderColor: 'var(--red-6)',
+          color: 'var(--red-11)'
+        };
       case 'warning':
-        return 'bg-yellow-50 border-yellow-200 text-yellow-800';
+        return {
+          backgroundColor: 'var(--yellow-2)',
+          borderColor: 'var(--yellow-6)',
+          color: 'var(--yellow-11)'
+        };
       case 'success':
-        return 'bg-green-50 border-green-200 text-green-800';
+        return {
+          backgroundColor: 'var(--green-2)',
+          borderColor: 'var(--green-6)',
+          color: 'var(--green-11)'
+        };
       default:
-        return 'bg-blue-50 border-blue-200 text-blue-800';
+        return {
+          backgroundColor: 'var(--blue-2)',
+          borderColor: 'var(--blue-6)',
+          color: 'var(--blue-11)'
+        };
     }
   };
 
   const getAlertIcon = (type: Alert['type']) => {
     switch (type) {
       case 'error':
-        return <ExclamationTriangleIcon className="w-5 h-5 text-red-500" />;
+        return <ExclamationTriangleIcon style={{ width: '20px', height: '20px', color: 'var(--red-9)' }} />;
       case 'warning':
-        return <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500" />;
+        return <ExclamationTriangleIcon style={{ width: '20px', height: '20px', color: 'var(--yellow-9)' }} />;
       case 'success':
-        return <CheckCircledIcon className="w-5 h-5 text-green-500" />;
+        return <CheckCircledIcon style={{ width: '20px', height: '20px', color: 'var(--green-9)' }} />;
       default:
-        return <InfoCircledIcon className="w-5 h-5 text-blue-500" />;
+        return <InfoCircledIcon style={{ width: '20px', height: '20px', color: 'var(--blue-9)' }} />;
     }
   };
 
@@ -61,31 +77,41 @@ export function AlertBanner({ alert, onDismiss }: AlertBannerProps) {
     }
   };
 
+  const alertColors = getAlertColors(alert.type);
+
   return (
-    <Box className={`p-4 rounded-lg border ${getAlertColors(alert.type)}`}>
+    <Box style={{
+      padding: '16px',
+      borderRadius: '8px',
+      border: `1px solid ${alertColors.borderColor}`,
+      backgroundColor: alertColors.backgroundColor,
+      color: alertColors.color
+    }}>
       <Flex justify="between" align="start" gap="3">
-        <Flex gap="3" align="start" className="flex-1">
+        <Flex gap="3" align="start" style={{ flex: 1 }}>
           {getAlertIcon(alert.type)}
-          <Box className="flex-1">
-            <Flex align="center" gap="2" className="mb-1">
+          <Box style={{ flex: 1 }}>
+            <Flex align="center" gap="2" style={{ marginBottom: '4px' }}>
               <Text weight="bold" size="3">{alert.title}</Text>
               <Badge color={getSeverityColor(alert.severity)} size="1">
                 {alert.severity.toUpperCase()}
               </Badge>
             </Flex>
             <Text size="2">{alert.message}</Text>
-            <Text size="1" color="gray" className="mt-1">
+            <Text size="1" color="gray" style={{ marginTop: '4px' }}>
               {new Date(alert.timestamp).toLocaleString()}
             </Text>
             
             {/* Contract-specific information */}
             {(alert.sender || alert.recipient || alert.amount || alert.riskScore) && (
-              <Box mt="2" p="2" style={{ 
+              <Box style={{ 
+                marginTop: '8px',
+                padding: '8px', 
                 backgroundColor: 'var(--gray-2)', 
                 borderRadius: 'var(--radius-2)' 
               }}>
                 {alert.riskScore && (
-                  <Flex align="center" gap="2" mb="1">
+                  <Flex align="center" gap="2" style={{ marginBottom: '4px' }}>
                     <Text size="1" color="gray">Risk Score:</Text>
                     <Badge color={alert.riskScore >= 70 ? 'red' : alert.riskScore >= 40 ? 'orange' : 'green'} size="1">
                       {alert.riskScore}
@@ -129,7 +155,7 @@ export function AlertBanner({ alert, onDismiss }: AlertBannerProps) {
           variant="ghost"
           size="1"
           onClick={onDismiss}
-          className="text-gray-400 hover:text-gray-600"
+          style={{ color: 'var(--gray-9)' }}
         >
           <Cross1Icon />
         </Button>

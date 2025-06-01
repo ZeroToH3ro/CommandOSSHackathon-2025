@@ -24,33 +24,33 @@ export function TransactionList({
   
   if (loading) {
     return (
-      <Box className="space-y-3">
+      <Flex direction="column" gap="3">
         {[...Array(5)].map((_, i) => (
-          <Card key={i} className="p-4">
-            <Box className="animate-pulse">
-              <Flex justify="between" align="center" className="mb-2">
-                <Box className="flex items-center space-x-3">
-                  <Box className="w-8 h-8 bg-gray-200 rounded-full"></Box>
+          <Card key={i} style={{ padding: '16px' }}>
+            <Box style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}>
+              <Flex justify="between" align="center" style={{ marginBottom: '8px' }}>
+                <Flex align="center" gap="3">
+                  <Box style={{ width: '32px', height: '32px', backgroundColor: 'var(--gray-4)', borderRadius: '50%' }}></Box>
                   <Box>
-                    <Box className="h-4 bg-gray-200 rounded w-24 mb-1"></Box>
-                    <Box className="h-3 bg-gray-200 rounded w-16"></Box>
+                    <Box style={{ height: '16px', backgroundColor: 'var(--gray-4)', borderRadius: '4px', width: '96px', marginBottom: '4px' }}></Box>
+                    <Box style={{ height: '12px', backgroundColor: 'var(--gray-4)', borderRadius: '4px', width: '64px' }}></Box>
                   </Box>
-                </Box>
-                <Box className="text-right">
-                  <Box className="h-4 bg-gray-200 rounded w-20 mb-1"></Box>
-                  <Box className="h-3 bg-gray-200 rounded w-12"></Box>
+                </Flex>
+                <Box style={{ textAlign: 'right' }}>
+                  <Box style={{ height: '16px', backgroundColor: 'var(--gray-4)', borderRadius: '4px', width: '80px', marginBottom: '4px' }}></Box>
+                  <Box style={{ height: '12px', backgroundColor: 'var(--gray-4)', borderRadius: '4px', width: '48px' }}></Box>
                 </Box>
               </Flex>
             </Box>
           </Card>
         ))}
-      </Box>
+      </Flex>
     );
   }
 
   if (transactions.length === 0) {
     return (
-      <Card className="p-8 text-center">
+      <Card style={{ padding: '32px', textAlign: 'center' }}>
         <Text color="gray" size="3">No transactions found</Text>
       </Card>
     );
@@ -59,15 +59,15 @@ export function TransactionList({
   const getTransactionIcon = (type: Transaction['type']) => {
     switch (type) {
       case 'send':
-        return <ArrowUpIcon className="w-5 h-5 text-red-500" />;
+        return <ArrowUpIcon style={{ width: '20px', height: '20px', color: 'var(--red-9)' }} />;
       case 'receive':
-        return <ArrowDownIcon className="w-5 h-5 text-green-500" />;
+        return <ArrowDownIcon style={{ width: '20px', height: '20px', color: 'var(--green-9)' }} />;
       case 'contract':
-        return <Box className="w-5 h-5 bg-blue-500 rounded"></Box>;
+        return <Box style={{ width: '20px', height: '20px', backgroundColor: 'var(--blue-9)', borderRadius: '4px' }}></Box>;
       case 'approval':
-        return <CheckCircledIcon className="w-5 h-5 text-orange-500" />;
+        return <CheckCircledIcon style={{ width: '20px', height: '20px', color: 'var(--orange-9)' }} />;
       default:
-        return <ClockIcon className="w-5 h-5 text-gray-500" />;
+        return <ClockIcon style={{ width: '20px', height: '20px', color: 'var(--gray-9)' }} />;
     }
   };
 
@@ -123,60 +123,63 @@ export function TransactionList({
   };
 
   return (
-    <Box className="space-y-2">
+    <Flex direction="column" gap="2">
       {transactions.map((transaction) => (
         <Card 
           key={transaction.id} 
-          className={`p-4 hover:shadow-md transition-shadow cursor-pointer ${
-            transaction.suspicious ? 'border-l-4 border-l-red-500' : ''
-          }`}
+          style={{
+            padding: '16px',
+            cursor: 'pointer',
+            transition: 'box-shadow 0.2s ease-in-out',
+            borderLeft: transaction.suspicious ? '4px solid var(--red-9)' : undefined
+          }}
           onClick={() => onTransactionClick?.(transaction)}
         >
           <Flex justify="between" align="center">
             {/* Left side - Transaction info */}
-            <Flex align="center" gap="3" className="flex-1">
-              <Box className="flex-shrink-0">
+            <Flex align="center" gap="3" style={{ flex: 1 }}>
+              <Box style={{ flexShrink: 0 }}>
                 {getTransactionIcon(transaction.type)}
               </Box>
               
-              <Box className="flex-1">
-                <Flex align="center" gap="2" className="mb-1">
-                  <Text weight="medium" size="3" className="capitalize">
+              <Box style={{ flex: 1 }}>
+                <Flex align="center" gap="2" style={{ marginBottom: '4px' }}>
+                  <Text weight="medium" size="3" style={{ textTransform: 'capitalize' }}>
                     {transaction.type}
                   </Text>
                   {getStatusBadge(transaction.status)}
                   {showRiskIndicators && getRiskBadge(transaction.riskScore)}
                   {transaction.suspicious && (
-                    <ExclamationTriangleIcon className="w-4 h-4 text-red-500" />
+                    <ExclamationTriangleIcon style={{ width: '16px', height: '16px', color: 'var(--red-9)' }} />
                   )}
                 </Flex>
                 
-                <Flex align="center" gap="2" className="text-sm text-gray-500">
-                  <Text size="2">
+                <Flex align="center" gap="2">
+                  <Text size="2" color="gray">
                     {transaction.type === 'send' ? 'To:' : 'From:'} {
                       formatAddress(transaction.type === 'send' ? transaction.to : transaction.from)
                     }
                   </Text>
-                  <Text size="2">•</Text>
-                  <Text size="2">{formatTimestamp(transaction.timestamp)}</Text>
+                  <Text size="2" color="gray">•</Text>
+                  <Text size="2" color="gray">{formatTimestamp(transaction.timestamp)}</Text>
                 </Flex>
               </Box>
             </Flex>
 
             {/* Right side - Amount and details */}
-            <Box className="text-right flex-shrink-0">
+            <Box style={{ textAlign: 'right', flexShrink: 0 }}>
               <Text 
                 weight="bold" 
                 size="3" 
-                className={
-                  transaction.type === 'send' ? 'text-red-600' : 'text-green-600'
-                }
+                style={{
+                  color: transaction.type === 'send' ? 'var(--red-9)' : 'var(--green-9)'
+                }}
               >
                 {transaction.type === 'send' ? '-' : '+'}
                 {formatAmount(transaction.amount, transaction.token)}
               </Text>
               
-              <Flex justify="end" align="center" gap="2" className="mt-1">
+              <Flex justify="end" align="center" gap="2" style={{ marginTop: '4px' }}>
                 {transaction.gasUsed && (
                   <Text size="1" color="gray">
                     Gas: {transaction.gasUsed.toFixed(6)}
@@ -191,14 +194,18 @@ export function TransactionList({
             </Box>
           </Flex>
 
-          {/* Transaction hash (optional, shown on hover or click) */}
-          <Box className="mt-2 pt-2 border-t border-gray-100">
-            <Text size="1" color="gray" className="font-mono">
+          {/* Transaction hash */}
+          <Box style={{ 
+            marginTop: '8px', 
+            paddingTop: '8px', 
+            borderTop: '1px solid var(--gray-6)' 
+          }}>
+            <Text size="1" color="gray" style={{ fontFamily: 'monospace' }}>
               {transaction.hash}
             </Text>
           </Box>
         </Card>
       ))}
-    </Box>
+    </Flex>
   );
 }
